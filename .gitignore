@@ -1,0 +1,90 @@
+# ── Python / Backend ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+*.pyc
+*.pyd
+*.pyo
+
+# Virtual environments
+venv/
+env/
+.venv/
+backend/venv/
+backend/env/
+backend/.venv/
+
+# Environment variables — NEVER commit real keys
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env.local
+
+# ── Next.js / Frontend ────────────────────────────────────────────
+.next/
+out/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.npm/
+frontend/.cache/
+
+# Node
+node_modules/
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
+
+# ── OS ────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Editor / IDE ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# ── Logs ─────────────────────────────────────────────────────────
+*.log
+logs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── Testing ───────────────────────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# ── Misc ─────────────────────────────────────────────────────────
+*.pem
+*.key
+*.cert
+.vercel

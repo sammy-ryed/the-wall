@@ -1,0 +1,534 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --ink:#0a0a0a;
+  --paper:#f5f0e8;
+  --red:#d63a2a;
+  --yellow:#f2c94c;
+  --green:#2a7a4b;
+  --muted:#8a8070;
+  --border:#0a0a0a;
+}
+
+.w{background:var(--paper);font-family:'Space Grotesk',sans-serif;color:var(--ink);min-height:900px;border:2px solid var(--border);}
+
+.header{
+  border-bottom:2px solid var(--ink);
+  padding:24px 28px 20px;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  position:relative;
+}
+.logo{
+  font-family:'Space Mono',monospace;
+  font-size:38px;font-weight:700;
+  letter-spacing:-2px;line-height:1;
+  color:var(--ink);
+}
+.logo span{
+  display:inline-block;
+  background:var(--ink);color:var(--paper);
+  padding:2px 8px;margin-left:2px;
+  font-size:12px;letter-spacing:0;font-weight:400;
+  vertical-align:middle;position:relative;top:-4px;
+}
+.header-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.live-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--red);display:inline-block;margin-right:6px;
+  animation:blink 1.4s infinite;
+}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.2;}}
+.live-label{font-size:12px;font-family:'Space Mono',monospace;color:var(--muted);}
+.count-label{font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;}
+
+.ticker{
+  border-bottom:1.5px solid var(--ink);
+  background:var(--ink);color:var(--paper);
+  padding:7px 0;overflow:hidden;white-space:nowrap;
+}
+.ticker-inner{
+  display:inline-block;
+  animation:tick 22s linear infinite;
+  font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.05em;
+}
+@keyframes tick{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+
+.main{display:grid;grid-template-columns:1fr 340px;border-bottom:2px solid var(--ink);}
+
+.feed{border-right:1.5px solid var(--ink);padding:0;}
+
+.feed-header{
+  padding:14px 20px;border-bottom:1.5px solid var(--ink);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.feed-title{font-size:11px;font-family:'Space Mono',monospace;color:var(--muted);letter-spacing:0.08em;}
+.sort-btns{display:flex;gap:0;}
+.sort-btn{
+  font-size:10px;font-family:'Space Mono',monospace;
+  border:1px solid var(--ink);padding:3px 10px;background:transparent;
+  cursor:pointer;color:var(--ink);transition:all 0.1s;
+}
+.sort-btn:first-child{border-right:none;}
+.sort-btn.active,.sort-btn:hover{background:var(--ink);color:var(--paper);}
+
+.card{
+  border-bottom:1.5px solid var(--ink);
+  padding:20px;
+  cursor:pointer;
+  transition:background 0.12s;
+  position:relative;
+}
+.card:hover{background:#ede8df;}
+
+.card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+.card-meta{display:flex;align-items:center;gap:10px;}
+.avatar{
+  width:32px;height:32px;border:1.5px solid var(--ink);
+  border-radius:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;font-family:'Space Mono',monospace;
+  flex-shrink:0;
+}
+.card-name{font-size:13px;font-weight:500;}
+.card-time{font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;}
+
+.scores{display:flex;gap:6px;}
+.score-chip{
+  font-size:10px;font-family:'Space Mono',monospace;
+  padding:3px 8px;border:1px solid var(--ink);
+  display:flex;align-items:center;gap:4px;
+}
+.score-chip.high{background:var(--red);color:#fff;border-color:var(--red);}
+.score-chip.mid{background:var(--yellow);color:var(--ink);border-color:var(--ink);}
+.score-chip.low{background:var(--green);color:#fff;border-color:var(--green);}
+
+.confession-text{
+  font-size:15px;line-height:1.55;color:var(--ink);
+  margin-bottom:14px;
+  font-weight:400;
+}
+
+.roast-bar{
+  border-left:3px solid var(--ink);
+  padding:8px 12px;
+  background:#ede8df;
+}
+.roast-label{font-size:10px;font-family:'Space Mono',monospace;color:var(--muted);margin-bottom:3px;letter-spacing:0.06em;}
+.roast-text{font-size:13px;line-height:1.45;font-style:italic;color:var(--ink);}
+
+.verdict-row{margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.verdict-tag{
+  font-size:10px;font-family:'Space Mono',monospace;
+  padding:3px 9px;border:1px solid var(--ink);
+  background:transparent;color:var(--ink);
+}
+.era-tag{
+  font-size:10px;font-family:'Space Mono',monospace;
+  padding:3px 9px;background:var(--ink);color:var(--paper);
+}
+
+.cringe-row{margin-top:14px;display:flex;align-items:center;gap:10px;}
+.cringe-label{font-size:10px;font-family:'Space Mono',monospace;color:var(--muted);width:48px;flex-shrink:0;}
+.cringe-track{flex:1;height:4px;background:#d0c9be;position:relative;}
+.cringe-fill{height:4px;background:var(--ink);transition:width 0.8s ease;}
+.cringe-num{font-size:11px;font-family:'Space Mono',monospace;font-weight:700;width:28px;text-align:right;flex-shrink:0;}
+
+.sidebar{padding:0;}
+
+.confess-area{
+  padding:20px;border-bottom:1.5px solid var(--ink);
+}
+.confess-heading{
+  font-size:22px;font-weight:700;letter-spacing:-0.5px;
+  line-height:1.1;margin-bottom:4px;
+}
+.confess-sub{font-size:12px;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:16px;}
+
+.textarea-wrap{position:relative;margin-bottom:12px;}
+textarea{
+  width:100%;height:110px;
+  border:1.5px solid var(--ink);
+  background:transparent;
+  font-family:'Space Grotesk',sans-serif;font-size:14px;
+  padding:12px;resize:none;color:var(--ink);
+  border-radius:0;outline:none;
+  transition:border-color 0.1s;
+}
+textarea:focus{border-color:var(--red);}
+textarea::placeholder{color:var(--muted);}
+.char-count{
+  position:absolute;bottom:10px;right:10px;
+  font-size:10px;font-family:'Space Mono',monospace;color:var(--muted);
+}
+
+.name-row{display:flex;gap:8px;margin-bottom:12px;}
+.name-input{
+  flex:1;border:1.5px solid var(--ink);
+  background:transparent;font-family:'Space Grotesk',sans-serif;font-size:13px;
+  padding:8px 12px;color:var(--ink);outline:none;border-radius:0;
+}
+.name-input::placeholder{color:var(--muted);}
+.name-input:focus{border-color:var(--red);}
+
+.submit-btn{
+  width:100%;padding:13px;
+  background:var(--ink);color:var(--paper);
+  border:none;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;letter-spacing:0.02em;transition:all 0.1s;border-radius:0;
+}
+.submit-btn:hover{background:var(--red);}
+.submit-btn:active{transform:scale(0.99);}
+.submit-btn:disabled{opacity:0.5;cursor:not-allowed;}
+
+.result-area{
+  border:1.5px solid var(--ink);
+  margin-top:14px;padding:14px;
+  display:none;
+}
+.result-area.show{display:block;}
+.result-scores{display:flex;gap:0;margin-bottom:12px;}
+.big-score{
+  flex:1;padding:10px 12px;text-align:center;
+  border-right:1px solid var(--ink);
+}
+.big-score:last-child{border-right:none;}
+.big-score-val{font-size:26px;font-weight:700;font-family:'Space Mono',monospace;line-height:1;}
+.big-score-label{font-size:9px;font-family:'Space Mono',monospace;color:var(--muted);margin-top:3px;letter-spacing:0.06em;}
+.result-roast{
+  border-top:1px solid var(--ink);padding-top:10px;
+  font-size:13px;font-style:italic;line-height:1.5;
+}
+.result-roast-label{font-size:9px;font-family:'Space Mono',monospace;color:var(--muted);margin-bottom:4px;letter-spacing:0.06em;}
+.post-btn{
+  margin-top:12px;width:100%;padding:8px;
+  border:1.5px solid var(--ink);background:transparent;
+  font-family:'Space Grotesk',sans-serif;font-size:12px;
+  cursor:pointer;color:var(--ink);transition:all 0.1s;
+}
+.post-btn:hover{background:var(--ink);color:var(--paper);}
+
+.stats-box{
+  padding:20px;border-bottom:1.5px solid var(--ink);
+}
+.stats-title{font-size:10px;font-family:'Space Mono',monospace;color:var(--muted);letter-spacing:0.08em;margin-bottom:14px;}
+.stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:0.5px solid #d0c9be;}
+.stat-row:last-child{border-bottom:none;}
+.stat-name{font-size:13px;}
+.stat-val{font-size:18px;font-weight:700;font-family:'Space Mono',monospace;}
+
+.most-cringed{padding:20px;}
+.mc-title{font-size:10px;font-family:'Space Mono',monospace;color:var(--muted);letter-spacing:0.08em;margin-bottom:14px;}
+.mc-item{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;}
+.mc-rank{font-size:28px;font-weight:700;font-family:'Space Mono',monospace;color:#d0c9be;line-height:1;flex-shrink:0;}
+.mc-text{font-size:12px;line-height:1.45;color:var(--ink);}
+.mc-name{font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;margin-top:2px;}
+
+.footer{
+  padding:14px 20px;display:flex;justify-content:space-between;align-items:center;
+  border-top:1.5px solid var(--ink);
+}
+.footer-text{font-size:11px;font-family:'Space Mono',monospace;color:var(--muted);}
+
+.loading-state{
+  display:none;text-align:center;padding:20px;
+  font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);
+}
+.loading-state.show{display:block;}
+.loading-dots::after{
+  content:'';animation:dots 1.2s infinite;
+}
+@keyframes dots{0%{content:'.';}33%{content:'..';}66%{content:'...';}100%{content:'.';}
+}
+</style>
+
+<div class="w">
+  <h2 class="sr-only">The Wall — anonymous confession and roast machine mockup</h2>
+
+  <div class="header">
+    <div>
+      <div class="logo">THE WALL<span>BETA</span></div>
+    </div>
+    <div class="header-right">
+      <div><span class="live-dot"></span><span class="live-label">241 watching</span></div>
+      <div class="count-label">1,847 confessions posted</div>
+    </div>
+  </div>
+
+  <div class="ticker">
+    <span class="ticker-inner">
+      &nbsp;&nbsp;&nbsp;&nbsp;RAHUL scored 97 cringe &nbsp;///&nbsp; PRIYA: "still alive, somehow" &nbsp;///&nbsp; VIKRAM broke prod on a Friday &nbsp;///&nbsp; SNEHA lied to her manager for 4 days straight &nbsp;///&nbsp; ANONYMOUS coward just posted &nbsp;///&nbsp; DEV's secret is now public &nbsp;///&nbsp; KAVYA texting in the bathroom again &nbsp;///&nbsp; ARJUN ghosted Google &nbsp;///&nbsp; YOUR CONFESSION IS NEXT &nbsp;///&nbsp; RAHUL scored 97 cringe &nbsp;///&nbsp; PRIYA: "still alive, somehow" &nbsp;///&nbsp; VIKRAM broke prod on a Friday &nbsp;///&nbsp; SNEHA lied to her manager for 4 days straight &nbsp;///&nbsp;
+    </span>
+  </div>
+
+  <div class="main">
+    <div class="feed">
+      <div class="feed-header">
+        <span class="feed-title">RECENT CONFESSIONS</span>
+        <div class="sort-btns">
+          <button class="sort-btn active">NEW</button>
+          <button class="sort-btn">CRINGE</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <div class="card-meta">
+            <div class="avatar" style="background:#0a0a0a;color:#f5f0e8;">VK</div>
+            <div>
+              <div class="card-name">Vikram</div>
+              <div class="card-time">3 min ago</div>
+            </div>
+          </div>
+          <div class="scores">
+            <div class="score-chip high">cringe 97</div>
+            <div class="score-chip low">surv 4%</div>
+          </div>
+        </div>
+        <div class="confession-text">I pushed to production on a Friday at 5pm and immediately went offline. Left the country.</div>
+        <div class="roast-bar">
+          <div class="roast-label">ROAST</div>
+          <div class="roast-text">You didn't go on vacation. You fled the scene of a crime.</div>
+        </div>
+        <div class="verdict-row">
+          <div class="verdict-tag">Chaos agent</div>
+          <div class="era-tag">Post-accountability arc</div>
+        </div>
+        <div class="cringe-row">
+          <div class="cringe-label">CRINGE</div>
+          <div class="cringe-track"><div class="cringe-fill" style="width:97%"></div></div>
+          <div class="cringe-num">97</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <div class="card-meta">
+            <div class="avatar" style="background:#EEEDFE;color:#3C3489;">PR</div>
+            <div>
+              <div class="card-name">Priya</div>
+              <div class="card-time">11 min ago</div>
+            </div>
+          </div>
+          <div class="scores">
+            <div class="score-chip mid">cringe 61</div>
+            <div class="score-chip mid">surv 71%</div>
+          </div>
+        </div>
+        <div class="confession-text">I've been saying "I'll refactor this later" for 3 years. It's still there. It powers billing.</div>
+        <div class="roast-bar">
+          <div class="roast-label">ROAST</div>
+          <div class="roast-text">Technical debt is just emotional debt in a trench coat.</div>
+        </div>
+        <div class="verdict-row">
+          <div class="verdict-tag">Relatable villain</div>
+          <div class="era-tag">Legacy code era</div>
+        </div>
+        <div class="cringe-row">
+          <div class="cringe-label">CRINGE</div>
+          <div class="cringe-track"><div class="cringe-fill" style="width:61%"></div></div>
+          <div class="cringe-num">61</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <div class="card-meta">
+            <div class="avatar" style="background:#E1F5EE;color:#085041;">AR</div>
+            <div>
+              <div class="card-name">Arjun</div>
+              <div class="card-time">28 min ago</div>
+            </div>
+          </div>
+          <div class="scores">
+            <div class="score-chip high">cringe 78</div>
+            <div class="score-chip mid">surv 55%</div>
+          </div>
+        </div>
+        <div class="confession-text">I ghosted a recruiter from Google because I panicked during the Zoom call. Never rescheduled. Still haunts me.</div>
+        <div class="roast-bar">
+          <div class="roast-label">ROAST</div>
+          <div class="roast-text">You dodged Google and hit yourself in the face on the way out.</div>
+        </div>
+        <div class="verdict-row">
+          <div class="verdict-tag">Self-saboteur</div>
+          <div class="era-tag">Late NPC arc</div>
+        </div>
+        <div class="cringe-row">
+          <div class="cringe-label">CRINGE</div>
+          <div class="cringe-track"><div class="cringe-fill" style="width:78%"></div></div>
+          <div class="cringe-num">78</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <div class="card-meta">
+            <div class="avatar" style="background:#FAECE7;color:#712B13;">AN</div>
+            <div>
+              <div class="card-name">Anonymous</div>
+              <div class="card-time">1 hr ago</div>
+            </div>
+          </div>
+          <div class="scores">
+            <div class="score-chip high">cringe 91</div>
+            <div class="score-chip mid">surv 68%</div>
+          </div>
+        </div>
+        <div class="confession-text">I fake-laughed at my CEO's joke so convincingly he used it as his opening bit at a conference. I was in the front row.</div>
+        <div class="roast-bar">
+          <div class="roast-label">ROAST</div>
+          <div class="roast-text">You are now legally his court jester. Wear the hat.</div>
+        </div>
+        <div class="verdict-row">
+          <div class="verdict-tag">Unhinged loyalty</div>
+          <div class="era-tag">Goblin mode, peak</div>
+        </div>
+        <div class="cringe-row">
+          <div class="cringe-label">CRINGE</div>
+          <div class="cringe-track"><div class="cringe-fill" style="width:91%"></div></div>
+          <div class="cringe-num">91</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="sidebar">
+      <div class="confess-area">
+        <div class="confess-heading">say it.<br>we rate it.</div>
+        <div class="confess-sub">anonymous. judged. roasted. posted.</div>
+
+        <div class="textarea-wrap">
+          <textarea id="txt" placeholder="what did you do..." maxlength="300" oninput="updateChar()"></textarea>
+          <span class="char-count" id="cc">0/300</span>
+        </div>
+
+        <div class="name-row">
+          <input class="name-input" id="nameInput" type="text" placeholder="your name (or don't)" maxlength="30">
+        </div>
+
+        <button class="submit-btn" id="submitBtn" onclick="submitConfession()">get roasted</button>
+
+        <div class="loading-state" id="loadingState">
+          <span class="loading-dots">reading your chaos</span>
+        </div>
+
+        <div class="result-area" id="resultArea">
+          <div class="result-scores" id="resultScores"></div>
+          <div class="result-roast" id="resultRoast"></div>
+          <button class="post-btn" onclick="postToWall()">post to wall</button>
+        </div>
+      </div>
+
+      <div class="stats-box">
+        <div class="stats-title">WALL STATS</div>
+        <div class="stat-row">
+          <span class="stat-name">avg cringe today</span>
+          <span class="stat-val">74</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">lowest survival</span>
+          <span class="stat-val">2%</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">most common era</span>
+          <span class="stat-val" style="font-size:13px;">NPC arc</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-name">cowards (anon)</span>
+          <span class="stat-val">61%</span>
+        </div>
+      </div>
+
+      <div class="most-cringed">
+        <div class="mc-title">HALL OF SHAME</div>
+        <div class="mc-item">
+          <div class="mc-rank">01</div>
+          <div>
+            <div class="mc-text">"I broke prod, blamed it on a network issue, fixed it in 6 min."</div>
+            <div class="mc-name">Dev — cringe 73, surv 92%</div>
+          </div>
+        </div>
+        <div class="mc-item">
+          <div class="mc-rank">02</div>
+          <div>
+            <div class="mc-text">"Told my manager I was almost done for 4 consecutive days."</div>
+            <div class="mc-name">Sneha — cringe 82, surv 60%</div>
+          </div>
+        </div>
+        <div class="mc-item">
+          <div class="mc-rank">03</div>
+          <div>
+            <div class="mc-text">"Copy-pasted StackOverflow. It's in prod. It works. I don't know why."</div>
+            <div class="mc-name">Vikram — cringe 88, surv 80%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="footer-text">the wall &copy; 2025 — no gods, no mercy</span>
+    <span class="footer-text">everything is anonymous. nothing is forgotten.</span>
+  </div>
+</div>
+
+<script>
+function updateChar(){
+  const t=document.getElementById('txt');
+  document.getElementById('cc').textContent=t.value.length+'/300';
+}
+
+const mockRoasts=[
+  {cringe:88,surv:22,roast:"This isn't a confession. It's a police report.",verdict:"Criminally unhinged",era:"Post-redemption arc"},
+  {cringe:71,surv:55,roast:"You didn't fail. You succeeded at the wrong thing.",verdict:"Chaotic neutral",era:"Main character syndrome"},
+  {cringe:94,surv:8,roast:"Deployment is temporary. Screenshots are forever.",verdict:"No survivors",era:"Terminal cringe era"},
+  {cringe:45,surv:78,roast:"Honestly? Relatable. That's what makes it worse.",verdict:"Soft villain",era:"Mid goblin mode"},
+  {cringe:99,surv:2,roast:"This is the one they'll read at your performance review.",verdict:"Legendary mistake",era:"End-stage NPC"},
+];
+
+function submitConfession(){
+  const txt=document.getElementById('txt').value.trim();
+  if(!txt)return;
+  const btn=document.getElementById('submitBtn');
+  const loading=document.getElementById('loadingState');
+  const result=document.getElementById('resultArea');
+  btn.disabled=true;
+  loading.classList.add('show');
+  result.classList.remove('show');
+  setTimeout(()=>{
+    loading.classList.remove('show');
+    const r=mockRoasts[Math.floor(Math.random()*mockRoasts.length)];
+    const scoresEl=document.getElementById('resultScores');
+    const roastEl=document.getElementById('resultRoast');
+    const survClass=r.surv<20?'color:var(--red)':r.surv<60?'color:var(--ink)':'color:var(--green)';
+    scoresEl.innerHTML=`
+      <div class="big-score" style="border-right:1px solid var(--ink)">
+        <div class="big-score-val" style="color:var(--red)">${r.cringe}</div>
+        <div class="big-score-label">CRINGE SCORE</div>
+      </div>
+      <div class="big-score">
+        <div class="big-score-val" style="${survClass}">${r.surv}%</div>
+        <div class="big-score-label">SURVIVAL</div>
+      </div>
+    `;
+    roastEl.innerHTML=`<div class="result-roast-label">ROAST</div>${r.roast}<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"><span style="font-size:10px;padding:2px 8px;border:1px solid var(--ink);font-family:'Space Mono',monospace;">${r.verdict}</span><span style="font-size:10px;padding:2px 8px;background:var(--ink);color:var(--paper);font-family:'Space Mono',monospace;">${r.era}</span></div>`;
+    result.classList.add('show');
+    btn.disabled=false;
+  },1800);
+}
+
+function postToWall(){
+  alert('Posted to the wall. No take-backs.');
+}
+
+document.querySelectorAll('.sort-btn').forEach(b=>{
+  b.addEventListener('click',function(){
+    document.querySelectorAll('.sort-btn').forEach(x=>x.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+</script>

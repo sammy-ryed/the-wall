@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design Tokens ──────────────────────────────────────────────── */
+:root {
+  --ink: #0a0a0a;
+  --paper: #f5f0e8;
+  --red: #d63a2a;
+  --yellow: #f2c94c;
+  --green: #2a7a4b;
+  --muted: #8a8070;
+  --paper-dark: #ede8df;
+  --paper-mid: #d0c9be;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border-radius: 0 !important; /* brutalist — no rounded corners anywhere */
+}
+
+html, body {
+  background: var(--paper);
+  font-family: 'Space Grotesk', sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--paper); }
+::-webkit-scrollbar-thumb { background: var(--paper-mid); }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Ticker animation ───────────────────────────────────────────── */
+@keyframes tick {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.ticker-inner {
+  display: inline-block;
+  white-space: nowrap;
+  animation: tick 32s linear infinite;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+/* ── Live dot blink ─────────────────────────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+.live-dot {
+  width: 8px; height: 8px;
+  border-radius: 50% !important;
+  background: var(--red);
+  display: inline-block;
+  animation: blink 1.4s infinite;
+  margin-right: 6px;
+}
+
+/* ── Loading dots ───────────────────────────────────────────────── */
+@keyframes ldots {
+  0%   { content: '.'; }
+  33%  { content: '..'; }
+  66%  { content: '...'; }
+  100% { content: '.'; }
+}
+.loading-dots::after {
+  content: '.';
+  animation: ldots 1.2s infinite;
+}
+
+/* ── Cringe bar fill ────────────────────────────────────────────── */
+.cringe-fill {
+  height: 4px;
+  background: var(--ink);
+  transition: width 0.8s ease-out;
+}
+
+/* ── Score chip colours ─────────────────────────────────────────── */
+.chip-high { background: var(--red);    color: #fff;        border-color: var(--red); }
+.chip-mid  { background: var(--yellow); color: var(--ink);  border-color: var(--ink); }
+.chip-low  { background: var(--green);  color: #fff;        border-color: var(--green); }
+
+/* ── Card hover ─────────────────────────────────────────────────── */
+.confession-card:hover { background: var(--paper-dark); }
+
+/* ── Pulse shimmer for loading skeleton ─────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--paper-dark) 25%, var(--paper-mid) 50%, var(--paper-dark) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
