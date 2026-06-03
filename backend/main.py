@@ -26,7 +26,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 _raw_origins = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,https://the-wall-fawn.vercel.app"
 )
 origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
