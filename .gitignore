@@ -21,12 +21,7 @@ backend/venv/
 backend/env/
 backend/.venv/
 
-# Environment variables — NEVER commit real keys
-.env
-.env.local
-.env.*.local
-backend/.env
-frontend/.env.local
+
 
 # ── Next.js / Frontend ────────────────────────────────────────────
 .next/
