@@ -102,3 +102,100 @@ html, body {
   background-size: 400px 100%;
   animation: shimmer 1.4s infinite linear;
 }
+
+/* ── Layout — Desktop two-column grid ───────────────────────────── */
+.wall-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.feed-col {
+  border-right: 1.5px solid var(--ink);
+  min-width: 0; /* prevent overflow */
+}
+
+.sidebar-col {
+  min-width: 0;
+}
+
+/* ── Mobile tab bar — hidden on desktop ─────────────────────────── */
+.mobile-tabs {
+  display: none;
+}
+
+/* ── Responsive: ≤ 768px ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Stack into single column */
+  .wall-grid {
+    grid-template-columns: 1fr;
+    border-bottom: none;
+  }
+
+  .feed-col {
+    border-right: none;
+  }
+
+  /* Mobile tabs control visibility */
+  .mobile-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--ink);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--paper);
+  }
+
+  .mobile-tab {
+    flex: 1;
+    padding: 12px 0;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    color: var(--muted);
+    min-height: 44px;
+    transition: all 0.12s;
+  }
+
+  .mobile-tab-active {
+    color: var(--ink);
+    border-bottom-color: var(--red);
+    font-weight: 700;
+  }
+
+  /* On mobile, hide the non-active tab content */
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  .mobile-visible {
+    display: block !important;
+  }
+
+  /* Ticker: slightly faster + smaller on mobile */
+  .ticker-inner {
+    font-size: 10px;
+    animation-duration: 22s;
+  }
+
+  /* Score chips: wrap on small screens */
+  .score-chip {
+    font-size: 9px !important;
+    padding: 2px 6px !important;
+  }
+}
+
+/* ── Desktop: always show both cols ─────────────────────────────── */
+@media (min-width: 769px) {
+  .mobile-hidden,
+  .mobile-visible {
+    display: block !important;
+  }
+  .mobile-tabs {
+    display: none !important;
+  }
+}

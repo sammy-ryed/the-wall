@@ -1,23 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { roastConfession, postConfession, type RoastResponse, type Confession } from "@/lib/api";
+import { createClient } from "@/lib/supabase";
 
 interface Props {
   onPosted: (c: Confession) => void;
+  user: User;
 }
 
 type Phase = "form" | "loading" | "result" | "error";
 
-export default function ConfessForm({ onPosted }: Props) {
+export default function ConfessForm({ onPosted, user }: Props) {
   const [text, setText] = useState("");
-  const [name, setName] = useState("");
+  const [isAnon, setIsAnon] = useState(false);
   const [phase, setPhase] = useState<Phase>("form");
   const [roast, setRoast] = useState<RoastResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [posting, setPosting] = useState(false);
 
   const MAX = 300;
+
+  // Derive display name from email (everything before @)
+  const displayName = user.email?.split("@")[0] ?? "you";
+  const postName = isAnon ? "Anonymous" : displayName;
 
   async function handleSubmit() {
     if (!text.trim()) return;
@@ -26,12 +33,15 @@ export default function ConfessForm({ onPosted }: Props) {
     setErrorMsg("");
 
     try {
-      const result = await roastConfession(text.trim());
+      // Attach auth token so backend can verify the user
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const result = await roastConfession(text.trim(), session?.access_token);
       setRoast(result);
       setPhase("result");
     } catch (e) {
       console.error(e);
-      setErrorMsg("Even Claude refused to engage with this.");
+      setErrorMsg("Roast engine choked. Try again.");
       setPhase("error");
     }
   }
@@ -40,19 +50,22 @@ export default function ConfessForm({ onPosted }: Props) {
     if (!roast) return;
     setPosting(true);
     try {
-      const posted = await postConfession({
-        name: name.trim() || "Anonymous",
-        confession: text.trim(),
-        cringe_score: roast.cringe_score,
-        survival_probability: roast.survival_probability,
-        roast: roast.roast,
-        verdict: roast.verdict,
-        era: roast.era,
-      });
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const posted = await postConfession(
+        {
+          name: postName,
+          confession: text.trim(),
+          cringe_score: roast.cringe_score,
+          survival_probability: roast.survival_probability,
+          roast: roast.roast,
+          verdict: roast.verdict,
+          era: roast.era,
+        },
+        session?.access_token
+      );
       onPosted(posted);
-      // Reset
       setText("");
-      setName("");
       setRoast(null);
       setPhase("form");
     } catch (e) {
@@ -85,7 +98,7 @@ export default function ConfessForm({ onPosted }: Props) {
         anonymous. judged. roasted. posted.
       </div>
 
-      {/* ── Form ──────────────────────────────────── */}
+      {/* ── Form ──────────────────────────────────────────── */}
       {(phase === "form" || phase === "error") && (
         <>
           <div style={{ position: "relative", marginBottom: 12 }}>
@@ -99,6 +112,7 @@ export default function ConfessForm({ onPosted }: Props) {
                 border: "1.5px solid #0a0a0a", background: "transparent",
                 fontFamily: "'Space Grotesk', sans-serif", fontSize: 14,
                 padding: 12, resize: "none", color: "#0a0a0a", outline: "none",
+                boxSizing: "border-box",
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = "#d63a2a")}
               onBlur={(e) => (e.currentTarget.style.borderColor = "#0a0a0a")}
@@ -112,26 +126,51 @@ export default function ConfessForm({ onPosted }: Props) {
             </span>
           </div>
 
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="your name (or don't)"
-              maxLength={30}
-              style={{
-                flex: 1, border: "1.5px solid #0a0a0a",
-                background: "transparent",
-                fontFamily: "'Space Grotesk', sans-serif", fontSize: 13,
-                padding: "8px 12px", color: "#0a0a0a", outline: "none",
-              }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#d63a2a")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#0a0a0a")}
-            />
+          {/* Anonymous toggle */}
+          <div
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              marginBottom: 14, cursor: "pointer",
+              padding: "8px 10px",
+              border: isAnon ? "1.5px solid #0a0a0a" : "1.5px solid #d0c9be",
+              background: isAnon ? "#0a0a0a" : "transparent",
+              transition: "all 0.12s",
+              userSelect: "none",
+            }}
+            onClick={() => setIsAnon((a) => !a)}
+          >
+            <div style={{
+              width: 14, height: 14,
+              border: `1.5px solid ${isAnon ? "#f5f0e8" : "#8a8070"}`,
+              background: isAnon ? "#f5f0e8" : "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, transition: "all 0.12s",
+            }}>
+              {isAnon && <span style={{ color: "#0a0a0a", fontSize: 9, lineHeight: 1 }}>✓</span>}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontSize: 12, fontFamily: "'Space Mono', monospace",
+                color: isAnon ? "#f5f0e8" : "#0a0a0a", fontWeight: 700,
+              }}>
+                confess as anonymous
+              </div>
+              <div style={{
+                fontSize: 10, fontFamily: "'Space Mono', monospace",
+                color: isAnon ? "#d0c9be" : "#8a8070", marginTop: 1,
+              }}>
+                {isAnon ? "posting as: Anonymous" : `posting as: ${displayName}`}
+              </div>
+            </div>
           </div>
 
           {phase === "error" && (
-            <div style={{ marginBottom: 10, padding: "8px 12px", border: "1px solid #d63a2a", background: "#FAECE7", fontSize: 12, color: "#d63a2a", fontFamily: "'Space Mono', monospace" }}>
+            <div style={{
+              marginBottom: 10, padding: "8px 12px",
+              border: "1px solid #d63a2a", background: "#FAECE7",
+              fontSize: 12, color: "#d63a2a",
+              fontFamily: "'Space Mono', monospace",
+            }}>
               {errorMsg}
             </div>
           )}
@@ -146,6 +185,7 @@ export default function ConfessForm({ onPosted }: Props) {
               border: "none", fontFamily: "'Space Grotesk', sans-serif",
               fontSize: 14, fontWeight: 600, cursor: text.trim() ? "pointer" : "not-allowed",
               letterSpacing: "0.02em", transition: "background 0.1s",
+              minHeight: 44,
             }}
             onMouseEnter={(e) => { if (text.trim()) e.currentTarget.style.background = "#d63a2a"; }}
             onMouseLeave={(e) => { if (text.trim()) e.currentTarget.style.background = "#0a0a0a"; }}
@@ -155,17 +195,17 @@ export default function ConfessForm({ onPosted }: Props) {
         </>
       )}
 
-      {/* ── Loading ───────────────────────────────── */}
+      {/* ── Loading ─────────────────────────────────────── */}
       {phase === "loading" && (
         <div style={{ textAlign: "center", padding: "28px 0", fontFamily: "'Space Mono', monospace", fontSize: 13, color: "#8a8070" }}>
           <span className="loading-dots">reading your chaos</span>
         </div>
       )}
 
-      {/* ── Result ────────────────────────────────── */}
+      {/* ── Result ──────────────────────────────────────── */}
       {phase === "result" && roast && (
         <div style={{ border: "1.5px solid #0a0a0a", padding: 14 }}>
-          {/* Big scores */}
+          {/* Scores */}
           <div style={{ display: "flex", marginBottom: 12 }}>
             <div style={{ flex: 1, padding: "10px 12px", textAlign: "center", borderRight: "1px solid #0a0a0a" }}>
               <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: "#d63a2a" }}>
@@ -191,12 +231,20 @@ export default function ConfessForm({ onPosted }: Props) {
             </div>
           </div>
 
-          {/* Post + Try again */}
+          {/* Posting as indicator */}
+          <div style={{
+            marginTop: 10, padding: "6px 10px",
+            background: "#ede8df",
+            fontSize: 10, fontFamily: "'Space Mono', monospace", color: "#8a8070",
+          }}>
+            posting as: <strong style={{ color: "#0a0a0a" }}>{postName}</strong>
+          </div>
+
           <button
             onClick={handlePost}
             disabled={posting}
             style={{
-              marginTop: 12, width: "100%", padding: 8,
+              marginTop: 10, width: "100%", padding: 10, minHeight: 44,
               border: "1.5px solid #0a0a0a", background: "transparent",
               fontFamily: "'Space Grotesk', sans-serif", fontSize: 12,
               cursor: posting ? "wait" : "pointer", color: "#0a0a0a", transition: "all 0.1s",
@@ -209,7 +257,7 @@ export default function ConfessForm({ onPosted }: Props) {
           <button
             onClick={handleTryAgain}
             style={{
-              marginTop: 6, width: "100%", padding: 8,
+              marginTop: 6, width: "100%", padding: 8, minHeight: 44,
               border: "1px solid #d0c9be", background: "transparent",
               fontFamily: "'Space Grotesk', sans-serif", fontSize: 12,
               cursor: "pointer", color: "#8a8070",

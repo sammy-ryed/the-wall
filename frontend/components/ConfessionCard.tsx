@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import type { Confession } from "@/lib/api";
+import { formatTimestamp } from "@/lib/api";
 
 interface Props {
   item: Confession;
@@ -85,7 +86,7 @@ export default function ConfessionCard({ item }: Props) {
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</div>
-            <div style={{ fontSize: 11, color: "#8a8070", fontFamily: "'Space Mono', monospace" }}>{item.timestamp}</div>
+            <div style={{ fontSize: 11, color: "#8a8070", fontFamily: "'Space Mono', monospace" }}>{formatTimestamp(item.timestamp)}</div>
           </div>
         </div>
 

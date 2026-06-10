@@ -1,9 +1,13 @@
 import os
 import uuid
+import logging
 from collections import Counter
+from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Query
+
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,18 +15,21 @@ load_dotenv()
 from models import (
     ConfessionIn, RoastOut,
     ConfessionPost, ConfessionSubmit,
-    StatsOut, ConfessionsResponse
+    StatsOut, ConfessionsResponse,
+    SessionRegister,
 )
 from roast import get_roast
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="The Wall API",
     description="Anonymous confession & roast machine — backend API.",
-    version="2.0.0"
+    version="2.1.0"
 )
 
 # ---------------------------------------------------------------------------
-# CORS — reads from env so deploying to EC2 just needs ALLOWED_ORIGINS set
+# CORS
 # ---------------------------------------------------------------------------
 _raw_origins = os.getenv(
     "ALLOWED_ORIGINS",
@@ -39,9 +46,64 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------------
-# In-memory store — seeded with the canonical 8 confessions.
-# On t3.micro without a DB this is wiped on restart. Good enough for now.
+# Supabase admin client — for JWT verification and session management
 # ---------------------------------------------------------------------------
+_supabase_url = os.getenv("SUPABASE_URL", "")
+_supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+
+try:
+    from supabase import create_client, Client as SupabaseClient
+    _supabase: Optional[SupabaseClient] = (
+        create_client(_supabase_url, _supabase_service_key)
+        if _supabase_url and _supabase_service_key
+        else None
+    )
+except Exception as e:
+    logger.warning(f"Supabase client init failed: {e}. Auth enforcement will be skipped.")
+    _supabase = None
+
+# ---------------------------------------------------------------------------
+# JWT verification helper
+# ---------------------------------------------------------------------------
+security = HTTPBearer(auto_error=False)
+
+def verify_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[dict]:
+    """
+    Verifies the Supabase JWT. Returns user dict if valid, None if no token.
+    Raises 401 if token is present but invalid.
+    """
+    if not credentials:
+        return None
+    if not _supabase:
+        # Supabase not configured — accept token as-is (dev mode)
+        return {"id": "dev-user"}
+    try:
+        response = _supabase.auth.get_user(credentials.credentials)
+        if response.user:
+            return {"id": response.user.id, "email": response.user.email}
+    except Exception as e:
+        logger.warning(f"JWT verification failed: {e}")
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    raise HTTPException(status_code=401, detail="Invalid token.")
+
+
+def require_auth(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> dict:
+    """Like verify_token but raises 401 if no token at all."""
+    user = verify_token(credentials)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    return user
+
+# ---------------------------------------------------------------------------
+# In-memory store — seeded with canonical confessions
+# ---------------------------------------------------------------------------
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
 def _seed() -> List[ConfessionPost]:
     seeds_raw = [
         {
@@ -104,9 +166,10 @@ def _seed() -> List[ConfessionPost]:
 
     results = []
     for i, s in enumerate(seeds_raw):
-        # Give seeds timestamps spread over the last 3 days
         hours_ago = (len(seeds_raw) - i) * 8
-        ts = f"{hours_ago}h ago" if hours_ago < 48 else f"{hours_ago // 24}d ago"
+        # Compute an actual ISO timestamp for seeds
+        from datetime import timedelta
+        ts = (datetime.now(timezone.utc) - timedelta(hours=hours_ago)).isoformat()
         results.append(ConfessionPost(
             id=f"seed-{i+1}",
             timestamp=ts,
@@ -116,8 +179,11 @@ def _seed() -> List[ConfessionPost]:
 
 _confessions: List[ConfessionPost] = _seed()
 
+# Single-session store: user_id -> session_token
+_active_sessions: dict[str, str] = {}
+
 # ---------------------------------------------------------------------------
-# Helper — compute stats from current store
+# Stats helper
 # ---------------------------------------------------------------------------
 def _compute_stats() -> StatsOut:
     total = len(_confessions)
@@ -141,60 +207,20 @@ def _compute_stats() -> StatsOut:
     )
 
 # ---------------------------------------------------------------------------
-# Routes
+# Routes — Public
 # ---------------------------------------------------------------------------
 
 @app.get("/health")
 def health():
-    """AWS load balancer / uptime check."""
-    return {"status": "ok", "version": "2.0.0"}
+    return {"status": "ok", "version": "2.1.0"}
 
 
 @app.get("/")
 def root():
     return {
         "status": "online",
-        "message": "The Wall API v2 — POST /roast, GET /confessions, GET /stats, GET /confessions/leaderboard"
+        "message": "The Wall API v2.1 — auth-gated confessions, Groq roasts."
     }
-
-
-@app.post("/roast", response_model=RoastOut)
-def roast_confession(payload: ConfessionIn):
-    """
-    Step 1 — user submits a confession, gets a roast back.
-    Does NOT save to the wall — user must explicitly POST /confessions to publish.
-    """
-    if not payload.confession or not payload.confession.strip():
-        raise HTTPException(status_code=400, detail="Confession cannot be empty.")
-    try:
-        return get_roast(payload.confession)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Roast engine failed: {str(e)}")
-
-
-@app.post("/confessions", response_model=ConfessionPost, status_code=201)
-def post_confession(payload: ConfessionSubmit):
-    """
-    Step 2 — user publishes their roast to the wall.
-    Called after /roast, when user clicks 'post to wall'.
-    """
-    # Use "just now" — strftime %-I is Linux-only; keep it simple
-    timestamp = "just now"
-
-    entry = ConfessionPost(
-        id=str(uuid.uuid4()),
-        name=payload.name or "Anonymous",
-        confession=payload.confession,
-        cringe_score=payload.cringe_score,
-        survival_probability=payload.survival_probability,
-        roast=payload.roast,
-        verdict=payload.verdict,
-        era=payload.era,
-        timestamp=timestamp,
-    )
-    # Prepend so newest is first
-    _confessions.insert(0, entry)
-    return entry
 
 
 @app.get("/confessions", response_model=ConfessionsResponse)
@@ -203,14 +229,10 @@ def list_confessions(
     per_page: int = Query(default=20, ge=1, le=100),
     sort: str = Query(default="new", pattern="^(new|cringe)$"),
 ):
-    """
-    Returns paginated confessions sorted by newest (default) or highest cringe.
-    GET /confessions?sort=cringe&page=1&per_page=20
-    """
     if sort == "cringe":
         ordered = sorted(_confessions, key=lambda c: c.cringe_score, reverse=True)
     else:
-        ordered = list(_confessions)  # already newest-first
+        ordered = list(_confessions)
 
     total = len(ordered)
     start = (page - 1) * per_page
@@ -227,25 +249,17 @@ def list_confessions(
 
 @app.get("/confessions/leaderboard", response_model=list)
 def leaderboard(limit: int = Query(default=3, ge=1, le=10)):
-    """
-    Hall of Shame — top N confessions by cringe score.
-    """
     ordered = sorted(_confessions, key=lambda c: c.cringe_score, reverse=True)
     return [c.model_dump() for c in ordered[:limit]]
 
 
 @app.get("/stats", response_model=StatsOut)
 def get_stats():
-    """Live wall-wide stats — avg cringe, lowest survival, most common era, anon %."""
     return _compute_stats()
 
 
 @app.get("/ticker")
 def get_ticker():
-    """
-    Returns a string of ticker entries built from the most recent 8 confessions.
-    Frontend scrolls this as the marquee.
-    """
     recent = _confessions[:8]
     parts = []
     for c in recent:
@@ -254,5 +268,84 @@ def get_ticker():
         parts.append(f"{name}: \"{c.verdict}\"")
     parts.append("YOUR CONFESSION IS NEXT")
     ticker_text = "    ///    ".join(parts)
-    # Double it for seamless loop
     return {"text": f"    {ticker_text}    ///    {ticker_text}    "}
+
+# ---------------------------------------------------------------------------
+# Routes — Auth required
+# ---------------------------------------------------------------------------
+
+@app.post("/roast", response_model=RoastOut)
+def roast_confession(
+    payload: ConfessionIn,
+    user: dict = Depends(require_auth),
+):
+    """
+    Step 1 — authenticated user submits a confession, gets a roast back.
+    Does NOT save to the wall.
+    """
+    if not payload.confession or not payload.confession.strip():
+        raise HTTPException(status_code=400, detail="Confession cannot be empty.")
+    try:
+        return get_roast(payload.confession)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Roast engine failed: {str(e)}")
+
+
+@app.post("/confessions", response_model=ConfessionPost, status_code=201)
+def post_confession(
+    payload: ConfessionSubmit,
+    user: dict = Depends(require_auth),
+):
+    """
+    Step 2 — authenticated user publishes their roast to the wall.
+    """
+    entry = ConfessionPost(
+        id=str(uuid.uuid4()),
+        name=payload.name or "Anonymous",
+        confession=payload.confession,
+        cringe_score=payload.cringe_score,
+        survival_probability=payload.survival_probability,
+        roast=payload.roast,
+        verdict=payload.verdict,
+        era=payload.era,
+        timestamp=_now_iso(),
+    )
+    _confessions.insert(0, entry)
+    return entry
+
+# ---------------------------------------------------------------------------
+# Routes — Single-session enforcement
+# ---------------------------------------------------------------------------
+
+@app.post("/auth/register-session")
+def register_session(
+    payload: SessionRegister,
+    user: dict = Depends(require_auth),
+):
+    """
+    Called right after login. Stores the new session token for this user,
+    invalidating any previous session from another device.
+    """
+    _active_sessions[user["id"]] = payload.session_token
+    return {"status": "ok"}
+
+
+@app.get("/auth/validate-session")
+def validate_session(
+    session_token: str = Query(...),
+    user: dict = Depends(require_auth),
+):
+    """
+    Called periodically by the frontend to check if this session is still active.
+    Returns 200 if valid, 401 if another device has taken over.
+    """
+    stored = _active_sessions.get(user["id"])
+    if stored is None:
+        # No session registered yet — treat as valid (grace period)
+        return {"status": "valid"}
+    if stored != session_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Session invalidated. Another device has signed in."
+        )
+    return {"status": "valid"}
