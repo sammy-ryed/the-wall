@@ -317,7 +317,8 @@ export default function TheWall() {
             ))
           ) : confessions.length === 0 ? (
             <div style={{ padding: 40, textAlign: "center", color: "#8a8070", fontFamily: "'Space Mono', monospace", fontSize: 13 }}>
-              No confessions yet. Be the first coward.
+              No confessions yet.<br />
+              <span style={{ fontSize: 11, marginTop: 6, display: "block" }}>be the first to say something stupid.</span>
             </div>
           ) : (
             confessions.map((c) => <ConfessionCard key={c.id} item={c} />)
