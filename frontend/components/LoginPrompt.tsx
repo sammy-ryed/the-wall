@@ -71,7 +71,7 @@ export default function LoginPrompt() {
               fontSize: 18,
             }}
           >
-            🔒
+            ⊘
           </div>
           <div
             style={{
