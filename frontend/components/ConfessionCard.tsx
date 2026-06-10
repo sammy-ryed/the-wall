@@ -122,7 +122,19 @@ export default function ConfessionCard({ item }: Props) {
 
       {/* ── Roast bar ────────────────────────────── */}
       <div style={{ borderLeft: "3px solid #0a0a0a", padding: "8px 12px", background: "#ede8df" }}>
-        <div style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: "#8a8070", marginBottom: 3, letterSpacing: "0.06em" }}>ROAST</div>
+        {item.target_name ? (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6, marginBottom: 5,
+          }}>
+            <span style={{
+              fontSize: 9, fontFamily: "'Space Mono', monospace",
+              background: "#d63a2a", color: "#fff", padding: "2px 6px",
+              letterSpacing: "0.06em",
+            }}>⚔ ROASTING {item.target_name.toUpperCase()}</span>
+          </div>
+        ) : (
+          <div style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: "#8a8070", marginBottom: 3, letterSpacing: "0.06em" }}>ROAST</div>
+        )}
         <div style={{ fontSize: 13, lineHeight: 1.45, fontStyle: "italic" }}>{item.roast}</div>
       </div>
 

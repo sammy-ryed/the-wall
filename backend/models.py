@@ -1,8 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
+
 class ConfessionIn(BaseModel):
     confession: str = Field(..., max_length=500, description="The confession text to roast.")
+
 
 class RoastOut(BaseModel):
     cringe_score: int = Field(..., ge=0, le=100)
@@ -10,9 +12,11 @@ class RoastOut(BaseModel):
     roast: str
     verdict: str
     era: str
+    target_name: Optional[str] = None  # Set when roasting someone else on the confessor's behalf
+
 
 class ConfessionPost(BaseModel):
-    """Full stored confession."""
+    """Full stored confession — returned by GET /confessions and POST /confessions."""
     id: str
     name: str
     confession: str
@@ -21,10 +25,28 @@ class ConfessionPost(BaseModel):
     roast: str
     verdict: str
     era: str
-    timestamp: str  # ISO 8601 UTC
+    timestamp: str          # ISO 8601 UTC
+    target_name: Optional[str] = None
+
+    @classmethod
+    def from_db_row(cls, row: dict) -> "ConfessionPost":
+        """Map a Supabase DB row to this model."""
+        return cls(
+            id=str(row["id"]),
+            name=row["name"],
+            confession=row["confession"],
+            cringe_score=row["cringe_score"],
+            survival_probability=row["survival_probability"],
+            roast=row["roast"],
+            verdict=row["verdict"],
+            era=row["era"],
+            timestamp=row.get("created_at", ""),
+            target_name=row.get("target_name"),
+        )
+
 
 class ConfessionSubmit(BaseModel):
-    """Payload to POST /confessions."""
+    """Payload to POST /confessions — saves a roasted confession to the wall."""
     name: Optional[str] = Field(default="Anonymous", max_length=40)
     confession: str = Field(..., max_length=500)
     cringe_score: int = Field(..., ge=0, le=100)
@@ -32,6 +54,8 @@ class ConfessionSubmit(BaseModel):
     roast: str
     verdict: str
     era: str
+    target_name: Optional[str] = None
+
 
 class StatsOut(BaseModel):
     total_confessions: int
@@ -40,11 +64,13 @@ class StatsOut(BaseModel):
     most_common_era: str
     anon_percent: float
 
+
 class ConfessionsResponse(BaseModel):
     confessions: List[ConfessionPost]
     total: int
     page: int
     per_page: int
+
 
 class SessionRegister(BaseModel):
     """Payload to register an active session token."""

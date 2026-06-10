@@ -61,6 +61,7 @@ export default function ConfessForm({ onPosted, user }: Props) {
           roast: roast.roast,
           verdict: roast.verdict,
           era: roast.era,
+          target_name: roast.target_name ?? null,
         },
         session?.access_token
       );
@@ -223,7 +224,19 @@ export default function ConfessForm({ onPosted, user }: Props) {
 
           {/* Roast text */}
           <div style={{ borderTop: "1px solid #0a0a0a", paddingTop: 10 }}>
-            <div style={{ fontSize: 9, fontFamily: "'Space Mono', monospace", color: "#8a8070", marginBottom: 4, letterSpacing: "0.06em" }}>ROAST</div>
+            {/* Who's being roasted */}
+            {roast.target_name ? (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6, marginBottom: 8,
+                padding: "5px 8px", background: "#d63a2a",
+              }}>
+                <span style={{ fontSize: 9, fontFamily: "'Space Mono', monospace", color: "#fff", letterSpacing: "0.08em" }}>⚔ ROASTING</span>
+                <span style={{ fontSize: 11, fontFamily: "'Space Mono', monospace", color: "#fff", fontWeight: 700 }}>{roast.target_name}</span>
+                <span style={{ fontSize: 9, fontFamily: "'Space Mono', monospace", color: "rgba(255,255,255,0.7)" }}>on your behalf</span>
+              </div>
+            ) : (
+              <div style={{ fontSize: 9, fontFamily: "'Space Mono', monospace", color: "#8a8070", marginBottom: 4, letterSpacing: "0.06em" }}>ROAST</div>
+            )}
             <div style={{ fontSize: 13, fontStyle: "italic", lineHeight: 1.5, marginBottom: 8 }}>{roast.roast}</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               <span style={{ fontSize: 10, padding: "2px 8px", border: "1px solid #0a0a0a", fontFamily: "'Space Mono', monospace" }}>{roast.verdict}</span>

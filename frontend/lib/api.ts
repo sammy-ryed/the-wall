@@ -14,6 +14,7 @@ export interface RoastResponse {
   roast: string;
   verdict: string;
   era: string;
+  target_name?: string | null;
 }
 
 export interface Confession {
@@ -26,6 +27,7 @@ export interface Confession {
   verdict: string;
   era: string;
   timestamp: string; // ISO 8601 from backend
+  target_name?: string | null;
 }
 
 export interface ConfessionsResponse {
@@ -129,6 +131,7 @@ export async function postConfession(
     roast: string;
     verdict: string;
     era: string;
+    target_name?: string | null;
   },
   token?: string
 ): Promise<Confession> {
