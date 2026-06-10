@@ -4,7 +4,6 @@ import logging
 from collections import Counter
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
-
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
