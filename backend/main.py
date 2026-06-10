@@ -2,7 +2,7 @@ import os
 import uuid
 import logging
 from collections import Counter
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query, Depends
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="The Wall API",
     description="Anonymous confession & roast machine — backend API.",
-    version="2.2.0"
+    version="3.0.0"
 )
 
 # ---------------------------------------------------------------------------
@@ -97,32 +97,14 @@ def require_auth(credentials: Optional[HTTPAuthorizationCredentials] = Depends(s
 
 
 # ---------------------------------------------------------------------------
-# In-memory store — used as fallback when Supabase is not configured
+# In-memory store — fallback when Supabase is not configured
+# No seed data. Wall starts empty and fills with real confessions.
 # ---------------------------------------------------------------------------
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _seed_memory() -> List[ConfessionPost]:
-    seeds_raw = [
-        {"name": "Rahul", "confession": "I pushed to production on a Friday at 5pm and immediately went offline. Left the country.", "cringe_score": 97, "survival_probability": 4, "roast": "You didn't go on vacation. You fled the scene of a crime.", "verdict": "Chaos agent", "era": "Post-accountability arc", "target_name": None},
-        {"name": "Priya", "confession": "I've been saying 'I'll refactor this later' for 3 years. It's still there. It powers billing.", "cringe_score": 61, "survival_probability": 71, "roast": "Technical debt is just emotional debt in a trench coat.", "verdict": "Relatable villain", "era": "Legacy code era", "target_name": None},
-        {"name": "Arjun", "confession": "I ghosted a recruiter from Google because I panicked during the Zoom call. Never rescheduled.", "cringe_score": 78, "survival_probability": 55, "roast": "You dodged Google and hit yourself in the face on the way out.", "verdict": "Self-saboteur", "era": "Late NPC arc", "target_name": None},
-        {"name": "Sneha", "confession": "I told my manager I was 'almost done' for 4 consecutive days.", "cringe_score": 82, "survival_probability": 60, "roast": "'Almost done' is a personality disorder at this point.", "verdict": "Temporal illusionist", "era": "Delusional arc", "target_name": None},
-        {"name": "Vikram", "confession": "I copy-pasted from StackOverflow without reading it. It's in prod. It works. I don't know why.", "cringe_score": 88, "survival_probability": 80, "roast": "Cargo cult programming achieved sentience. Congrats.", "verdict": "Voodoo developer", "era": "Ctrl-C Ctrl-V", "target_name": None},
-        {"name": "Anonymous", "confession": "I fake-laughed at my CEO's joke so convincingly he used it as his opening bit at a conference.", "cringe_score": 91, "survival_probability": 68, "roast": "You are now legally his court jester. Wear the hat.", "verdict": "Unhinged loyalty", "era": "Goblin mode, peak", "target_name": None},
-        {"name": "Kavya", "confession": "I've attended every 'mandatory fun' team event while texting from the bathroom.", "cringe_score": 55, "survival_probability": 88, "roast": "Tactical introvert. Respect.", "verdict": "Bathroom bandit", "era": "Tactical escape", "target_name": None},
-        {"name": "Dev", "confession": "I broke prod, blamed it on a 'network issue', fixed it in 6 minutes, and nobody ever knew.", "cringe_score": 73, "survival_probability": 92, "roast": "This is not a confession. This is a flex.", "verdict": "Shadow operator", "era": "Sigma dev grind", "target_name": None},
-    ]
-    results = []
-    for i, s in enumerate(seeds_raw):
-        hours_ago = (len(seeds_raw) - i) * 8
-        ts = (datetime.now(timezone.utc) - timedelta(hours=hours_ago)).isoformat()
-        results.append(ConfessionPost(id=f"seed-{i+1}", timestamp=ts, **s))
-    return results
-
-
-_confessions_memory: List[ConfessionPost] = _seed_memory()
+_confessions_memory: List[ConfessionPost] = []
 _active_sessions: dict[str, str] = {}
 
 # ---------------------------------------------------------------------------
@@ -343,7 +325,23 @@ def register_session(
     payload: SessionRegister,
     user: dict = Depends(require_auth),
 ):
-    _active_sessions[user["id"]] = payload.session_token
+    """
+    Called immediately after login.
+    Upserts the session token into Supabase active_sessions (or in-memory fallback).
+    Any existing session for this user_id is overwritten — kicking out the old device.
+    """
+    if _supabase:
+        try:
+            _supabase.table("active_sessions").upsert({
+                "user_id": user["id"],
+                "session_token": payload.session_token,
+                "updated_at": _now_iso(),
+            }).execute()
+        except Exception as e:
+            logger.warning(f"Session DB upsert failed, falling back to memory: {e}")
+            _active_sessions[user["id"]] = payload.session_token
+    else:
+        _active_sessions[user["id"]] = payload.session_token
     return {"status": "ok"}
 
 
@@ -352,9 +350,36 @@ def validate_session(
     session_token: str = Query(...),
     user: dict = Depends(require_auth),
 ):
-    stored = _active_sessions.get(user["id"])
+    """
+    Called every 60s + on window focus by the frontend.
+    Returns 200 if this session is still the active one, 401 if another device logged in.
+    Persisted in Supabase so it survives backend restarts.
+    """
+    stored: Optional[str] = None
+
+    if _supabase:
+        try:
+            result = (
+                _supabase.table("active_sessions")
+                .select("session_token")
+                .eq("user_id", user["id"])
+                .maybe_single()
+                .execute()
+            )
+            if result.data:
+                stored = result.data.get("session_token")
+        except Exception as e:
+            logger.warning(f"Session DB read failed, falling back to memory: {e}")
+            stored = _active_sessions.get(user["id"])
+    else:
+        stored = _active_sessions.get(user["id"])
+
     if stored is None:
+        # No session registered yet — grace period (first login after restart)
         return {"status": "valid"}
     if stored != session_token:
-        raise HTTPException(status_code=401, detail="Session invalidated. Another device has signed in.")
+        raise HTTPException(
+            status_code=401,
+            detail="Session invalidated. Another device has signed in."
+        )
     return {"status": "valid"}
