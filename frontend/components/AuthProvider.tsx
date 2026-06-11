@@ -25,6 +25,7 @@ interface AuthContextValue {
   kickedOut: boolean;
   signIn: (email: string, password: string, rememberMe: boolean) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   clearKickedOut: () => void;
 }
@@ -269,6 +270,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }, [supabase]);
 
+  // ── Sign In with Google ───────────────────────────────────────
+  const signInWithGoogle = useCallback(async () => {
+    const siteOrigin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_SITE_URL ?? "https://the-wall-fawn.vercel.app");
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${siteOrigin}/`,
+      },
+    });
+  }, [supabase]);
+
   // ── Sign Out ──────────────────────────────────────────────────
   const signOut = useCallback(async () => {
     if (validateIntervalRef.current) clearInterval(validateIntervalRef.current);
@@ -283,7 +298,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, isVerified, kickedOut, signIn, signUp, signOut, clearKickedOut }}
+      value={{ user, session, loading, isVerified, kickedOut, signIn, signUp, signInWithGoogle, signOut, clearKickedOut }}
     >
       {children}
     </AuthContext.Provider>
