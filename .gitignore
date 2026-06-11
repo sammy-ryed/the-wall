@@ -83,3 +83,11 @@ coverage.xml
 *.key
 *.cert
 .vercel
+
+# ── Environment / Secrets (NEVER commit these) ────────────────────
+.env
+.env.local
+.env.*.local
+.env.production
+backend/.env
+frontend/.env.local

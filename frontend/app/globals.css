@@ -45,7 +45,7 @@ html, body {
 .ticker-inner {
   display: inline-block;
   white-space: nowrap;
-  animation: tick 16s linear infinite;
+  animation: tick 10s linear infinite;
   font-family: 'Space Mono', monospace;
   font-size: 12px;
   letter-spacing: 0.05em;
@@ -176,10 +176,10 @@ html, body {
     display: block !important;
   }
 
-  /* Ticker: faster + smaller on mobile */
+  /* Ticker: fast on mobile */
   .ticker-inner {
     font-size: 10px;
-    animation-duration: 12s;
+    animation-duration: 8s;
   }
 
   /* Score chips: wrap on small screens */
