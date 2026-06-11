@@ -108,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isVerified = !!user?.email_confirmed_at;
 
-  // ── Periodic session validation (every 60s + on window focus) ──
+  // ── Periodic session validation (every 20s + on visibility/focus change) ──
   const startValidationLoop = useCallback(
     (sess: Session, nonce: string) => {
       if (validateIntervalRef.current) clearInterval(validateIntervalRef.current);
@@ -122,13 +122,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      validateIntervalRef.current = setInterval(check, 60_000);
+      // Run immediately so a kicked-out session is caught without waiting
+      check();
 
+      // Then poll every 20 seconds
+      validateIntervalRef.current = setInterval(check, 20_000);
+
+      // Also check on window focus AND tab visibility change
+      // (visibilitychange is more reliable across Chrome profiles than focus)
       const onFocus = () => check();
+      const onVisibility = () => {
+        if (document.visibilityState === "visible") check();
+      };
       window.addEventListener("focus", onFocus);
+      document.addEventListener("visibilitychange", onVisibility);
+
       return () => {
         if (validateIntervalRef.current) clearInterval(validateIntervalRef.current);
         window.removeEventListener("focus", onFocus);
+        document.removeEventListener("visibilitychange", onVisibility);
       };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,9 +157,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
 
       if (sess) {
-        const nonce = getStoredNonce();
-        if (nonce) {
-          // Validate existing session
+        let nonce = getStoredNonce();
+
+        if (!nonce) {
+          // No nonce stored — this session predates enforcement, or
+          // a previous registerSession failed. Register a fresh nonce now
+          // so enforcement starts immediately for this session.
+          nonce = generateNonce();
+          const rememberMe = typeof window !== "undefined"
+            ? localStorage.getItem("wall_remember_me") === "true"
+            : false;
+          const ok = await registerSession(sess.access_token, nonce);
+          if (ok) {
+            storeNonce(nonce, rememberMe);
+          } else {
+            // Backend unreachable — store locally anyway so we can at least
+            // detect multi-tab within this browser
+            storeNonce(nonce, rememberMe);
+          }
+        } else {
+          // Nonce exists — do an immediate validation before starting the loop
           const valid = await validateSession(sess.access_token, nonce);
           if (!valid) {
             clearNonce();
@@ -155,8 +184,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setKickedOut(true);
             return;
           }
-          cleanup = startValidationLoop(sess, nonce);
         }
+
+        cleanup = startValidationLoop(sess, nonce);
       }
     });
 
@@ -194,13 +224,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) return { error: error.message };
       if (!data.session) return { error: "No session returned." };
 
-      // Enforce single-session: register a new nonce
+      // Generate a fresh nonce for this login — always store it locally
+      // so enforcement works even if the backend is momentarily unreachable.
       const nonce = generateNonce();
-      const ok = await registerSession(data.session.access_token, nonce);
-      if (ok) {
-        storeNonce(nonce, rememberMe);
-        startValidationLoop(data.session, nonce);
-      }
+      storeNonce(nonce, rememberMe);
+
+      // Best-effort: register with the backend. If it fails, local enforcement
+      // still works within the same browser. The next /validate-session call
+      // will reconcile once the backend is reachable.
+      registerSession(data.session.access_token, nonce).catch(() => {
+        // Intentionally fire-and-forget — don't block sign-in
+      });
+
+      startValidationLoop(data.session, nonce);
 
       return { error: null };
     },
@@ -208,9 +244,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [startValidationLoop]
   );
 
+
   // ── Sign Up ───────────────────────────────────────────────────
   const signUp = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    // Use the current origin so the verification link in the email redirects
+    // back to the actual deployed site (not localhost). Falls back to the
+    // Vercel deployment URL if window is unavailable (SSR).
+    const siteOrigin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_SITE_URL ?? "https://the-wall-fawn.vercel.app");
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${siteOrigin}/login`,
+      },
+    });
     if (error) return { error: error.message };
     return { error: null };
   }, [supabase]);

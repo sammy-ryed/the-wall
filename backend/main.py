@@ -336,6 +336,8 @@ def register_session(
                 "session_token": payload.session_token,
                 "updated_at": _now_iso(),
             }).execute()
+            # Also mirror to memory so validate_session can fall back consistently
+            _active_sessions[user["id"]] = payload.session_token
         except Exception as e:
             logger.warning(f"Session DB upsert failed, falling back to memory: {e}")
             _active_sessions[user["id"]] = payload.session_token
@@ -350,7 +352,7 @@ def validate_session(
     user: dict = Depends(require_auth),
 ):
     """
-    Called every 60s + on window focus by the frontend.
+    Called every 20s + on visibility/focus change by the frontend.
     Returns 200 if this session is still the active one, 401 if another device logged in.
     Persisted in Supabase so it survives backend restarts.
     """
@@ -367,6 +369,10 @@ def validate_session(
             )
             if result.data:
                 stored = result.data.get("session_token")
+            else:
+                # Row missing in DB (e.g. upsert previously failed) —
+                # fall back to in-memory mirror which is always written.
+                stored = _active_sessions.get(user["id"])
         except Exception as e:
             logger.warning(f"Session DB read failed, falling back to memory: {e}")
             stored = _active_sessions.get(user["id"])

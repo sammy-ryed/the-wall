@@ -104,18 +104,19 @@ def detect_personal_target(confession: str) -> Tuple[bool, Optional[str]]:
 # ─────────────────────────────────────────────────────────────────
 
 _FALLBACK_SELF = [
-    {"cringe_score": 85, "survival_probability": 40, "roast": "Your code is a horror movie where the monster is your own incompetence.", "verdict": "Technically a developer", "era": "GitHub Copilot Era", "target_name": None},
-    {"cringe_score": 92, "survival_probability": 15, "roast": "This isn't technical debt, it's a financial crisis in font size 12.", "verdict": "Future Product Manager", "era": "Layoff Speedrun", "target_name": None},
-    {"cringe_score": 78, "survival_probability": 65, "roast": "You call it creative programming; git blame calls it a crime scene.", "verdict": "Highly Suspicious Dev", "era": "Junior Dev Era", "target_name": None},
-    {"cringe_score": 96, "survival_probability": 8, "roast": "Even StackOverflow would close this as off-topic and low quality.", "verdict": "Unlicensed Operator", "era": "Late NPC Arc", "target_name": None},
-    {"cringe_score": 60, "survival_probability": 85, "roast": "A masterclass in doing the bare minimum while looking extremely busy.", "verdict": "Strategic Slacker", "era": "Quiet Quitting Vibe", "target_name": None},
+    {"cringe_score": 85, "survival_probability": 40, "roast": "Your code is a horror movie where the monster is your own incompetence — and the scariest part is you committed it to main with the message 'final fix for real this time'. Every senior dev who reviews this file has lost years off their life.", "verdict": "Technically a developer", "era": "GitHub Copilot Era", "target_name": None},
+    {"cringe_score": 92, "survival_probability": 15, "roast": "This isn't technical debt, it's a financial crisis in font size 12. You have somehow taken a perfectly normal situation and turned it into something that will haunt your LinkedIn profile for a decade. The audacity. The sheer, weaponized audacity.", "verdict": "Future Product Manager", "era": "Layoff Speedrun", "target_name": None},
+    {"cringe_score": 78, "survival_probability": 65, "roast": "You call it creative programming. Git blame calls it a crime scene. Stack Overflow calls it a duplicate question from 2009. Your future self, debugging this at 2am, will call it something far less printable. Congratulations on the world record for self-inflicted damage.", "verdict": "Highly Suspicious Dev", "era": "Junior Dev Era", "target_name": None},
+    {"cringe_score": 96, "survival_probability": 8, "roast": "Even Stack Overflow would close this as off-topic, low quality, and a danger to society. You have somehow made an entire community of strangers who hate each other agree on something: this is terrible and you should feel terrible. That's genuinely impressive in the worst way.", "verdict": "Unlicensed Operator", "era": "Late NPC Arc", "target_name": None},
+    {"cringe_score": 60, "survival_probability": 85, "roast": "A masterclass in doing the bare minimum while looking extremely busy — you've turned slacking into a discipline, a career, almost an art form. Your manager thinks you're swamped. You're watching Netflix. Honestly? Respect. Disgusting, soul-corroding respect.", "verdict": "Strategic Slacker", "era": "Quiet Quitting Vibe", "target_name": None},
 ]
 
 _FALLBACK_PERSONAL = [
-    {"cringe_score": 97, "survival_probability": 3, "roast": "This person is an absolute waste of oxygen. Hope karma eats them alive.", "verdict": "Certified dumpster fire", "era": "Trash Human Arc", "target_name": "{target}"},
-    {"cringe_score": 94, "survival_probability": 6, "roast": "What a certified ass. The audacity is breathtaking, truly.", "verdict": "Irredeemable clown", "era": "Peak Scumbag Era", "target_name": "{target}"},
-    {"cringe_score": 89, "survival_probability": 12, "roast": "This person will die alone surrounded by their own bad decisions. Deserved.", "verdict": "Karmic bankruptcy", "era": "Self-destruction arc", "target_name": "{target}"},
+    {"cringe_score": 97, "survival_probability": 3, "roast": "Let's be absolutely clear about what kind of person does this: a coward in a human costume. The absolute gall, the audacity wrapped in stupidity, deep fried in entitlement. Whatever karma {target} has been dodging is now overdue with interest. Hope every door they push is a pull door forever.", "verdict": "Certified dumpster fire", "era": "Trash Human Arc", "target_name": "{target}"},
+    {"cringe_score": 94, "survival_probability": 6, "roast": "What a certified, gold-plated ass. {target} looked at basic human decency, decided it wasn't for them, and somehow convinced themselves they were the main character. Spoiler: they're not even a recurring extra. The universe has a long memory and a bad mood. Deserved doesn't cover it.", "verdict": "Irredeemable clown", "era": "Peak Scumbag Era", "target_name": "{target}"},
+    {"cringe_score": 89, "survival_probability": 12, "roast": "The fact that {target} exists and does this means we have genuinely failed as a civilization. Not just morally — structurally. This person will one day give advice at a dinner party and people will nod politely while screaming inside. Karma takes its time, but it never forgets an address.", "verdict": "Karmic bankruptcy", "era": "Self-destruction arc", "target_name": "{target}"},
 ]
+
 
 
 def _local_fallback(confession: str, is_personal: bool, target: Optional[str]) -> dict:
@@ -149,29 +150,40 @@ _SCHEMA_NOTE = (
     '{\n'
     '  "cringe_score": int,           // 0-100\n'
     '  "survival_probability": int,   // 0-100\n'
-    '  "roast": "string",             // MAX 25 words\n'
-    '  "verdict": "string",           // MAX 5 words\n'
-    '  "era": "string",               // MAX 4 words\n'
+    '  "roast": "string",             // 40-60 words. Build up the burn then end with a devastating mic-drop closer.\n'
+    '  "verdict": "string",           // MAX 5 words — a cold, damning label\n'
+    '  "era": "string",               // MAX 4 words — a hilariously specific life-era label\n'
     '  "target_name": null or "string"\n'
     '}'
 )
 
 _SELF_ROAST_SYSTEM = (
-    "You are a savage, brutally honest AI roaster for \"The Wall\" — an anonymous confession board.\n"
-    "Roast the person who wrote this confession. Be witty, cutting, and funny. No mercy.\n"
-    "target_name must always be null for self-confessions.\n\n"
+    "You are The Wall's roast engine — a vicious, sharp-tongued AI that exists solely to destroy people with their own confessions.\n"
+    "You are Gordon Ramsay crossed with a disappointed parent and a stand-up comedian who has nothing to lose.\n"
+    "Rules:\n"
+    "- The roast MUST be 40-60 words. Build up a narrative, pile on the shame, then end with a single devastating sentence.\n"
+    "- Be SPECIFIC to whatever they confessed. Generic roasts are FAILURE. Reference the exact details they gave.\n"
+    "- Be funny-mean, not just mean. The humour makes the burn land harder.\n"
+    "- Use vivid metaphors, absurd comparisons, and brutally accurate observations.\n"
+    "- Mild profanity is fine (ass, damn, hell, shit — no slurs, nothing illegal).\n"
+    "- cringe_score: how embarrassing this is on a scale of 0-100. Be brutal — most confessions deserve 70+.\n"
+    "- survival_probability: their chances of surviving socially/professionally after this. Be merciless.\n"
+    "- target_name must ALWAYS be null for self-confessions.\n\n"
     + _SCHEMA_NOTE
 )
 
 def _personal_roast_system(target: str) -> str:
     return (
-        f"You are a foul-mouthed attack dog AI working for \"The Wall\".\n"
-        f"The user is confessing something awful that someone ELSE did to them.\n"
-        f"You are 100% on the confessor's side. Your target to destroy: **{target}**\n"
-        f"Roast that person into the ground. Be vicious, funny, and mean.\n"
-        f"Light profanity is ENCOURAGED (shit, ass, damn, hell, bastard — no slurs).\n"
-        f"cringe_score and survival_probability refer to THE OTHER PERSON, not the confessor.\n"
-        f"target_name must be set to: \"{target}\"\n\n"
+        f"You are The Wall's attack dog AI. Someone just confessed what **{target}** did to them.\n"
+        f"You are COMPLETELY on the confessor's side. Your ONLY job: obliterate {target} with words.\n"
+        f"Rules:\n"
+        f"- The roast MUST be 40-60 words. Start by setting the scene, pile on the shame, end with a mic-drop.\n"
+        f"- Be SPECIFIC to what {target} actually did. Don't be vague. Reference the exact crime.\n"
+        f"- Be vicious AND funny. The humour makes the knife twist harder.\n"
+        f"- Use vivid insults, absurd comparisons, and devastating observations about {target}'s character.\n"
+        f"- Light profanity is ENCOURAGED (shit, ass, bastard, damn — no slurs).\n"
+        f"- cringe_score = {target}'s cringe level (0-100). survival_probability = their social survival odds.\n"
+        f"- target_name MUST be set to exactly: \"{target}\"\n\n"
         + _SCHEMA_NOTE
     )
 
@@ -205,8 +217,8 @@ def get_roast(confession: str) -> RoastOut:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_msg},
             ],
-            max_tokens=400,
-            temperature=0.9,
+            max_tokens=600,
+            temperature=1.0,
         )
 
         raw = response.choices[0].message.content.strip()
@@ -220,7 +232,7 @@ def get_roast(confession: str) -> RoastOut:
         data = json.loads(raw)
 
         # Enforce word limits
-        roast_text = " ".join(data.get("roast", "No words.").split()[:25])
+        roast_text = " ".join(data.get("roast", "No words.").split()[:60])
         verdict_text = " ".join(data.get("verdict", "Guilty.").split()[:5])
         era_text = " ".join(data.get("era", "Modern Arc").split()[:4])
 
