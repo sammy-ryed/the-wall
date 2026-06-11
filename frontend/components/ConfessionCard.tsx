@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import type { Confession } from "@/lib/api";
 import { formatTimestamp } from "@/lib/api";
+import ReplySection from "@/components/ReplySection";
 
 interface Props {
   item: Confession;
@@ -148,7 +149,7 @@ export default function ConfessionCard({ item }: Props) {
         </span>
       </div>
 
-      {/* ── Cringe bar ───────────────────────────── */}
+      {/* ── Cringe bar ───────────────────────────────────────── */}
       <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: "#8a8070", width: 48, flexShrink: 0 }}>CRINGE</span>
         <div style={{ flex: 1, height: 4, background: "#d0c9be", position: "relative" }}>
@@ -158,6 +159,9 @@ export default function ConfessionCard({ item }: Props) {
           {item.cringe_score}
         </span>
       </div>
+
+      {/* ── Replies ──────────────────────────────────────────── */}
+      <ReplySection confessionId={item.id} />
     </div>
   );
 }
