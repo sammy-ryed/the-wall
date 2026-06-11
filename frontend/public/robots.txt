@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://the-wall-fawn.vercel.app/sitemap.xml
