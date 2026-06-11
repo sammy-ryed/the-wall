@@ -124,9 +124,8 @@ export default function ReplySection({ confessionId }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const hasFetched = useRef(false);
 
-  // Fetch replies when panel opens (once)
+  // Fetch replies when page loads
   useEffect(() => {
-    if (!open) return;
     if (hasFetched.current) return;
     hasFetched.current = true;
 
@@ -138,7 +137,7 @@ export default function ReplySection({ confessionId }: Props) {
       })
       .catch(() => setError("couldn't load replies"))
       .finally(() => setLoadingReplies(false));
-  }, [open, confessionId]);
+  }, [confessionId]);
 
   // Derive display name from logged-in user
   const displayName = user ? getDisplayName(user as Parameters<typeof getDisplayName>[0]) : "";
@@ -199,8 +198,8 @@ export default function ReplySection({ confessionId }: Props) {
         {count === 0 && !hasFetched.current
           ? "reply"
           : count === 0
-          ? "no replies yet"
-          : `${count} ${count === 1 ? "reply" : "replies"}`}
+            ? "no replies yet"
+            : `${count} ${count === 1 ? "reply" : "replies"}`}
         {!open && count > 0 && (
           <span
             style={{
