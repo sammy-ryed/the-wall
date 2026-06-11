@@ -49,6 +49,15 @@ export interface TickerResponse {
   text: string;
 }
 
+export interface Reply {
+  id: string;
+  confession_id: string;
+  user_id: string;
+  display_name: string;
+  body: string;
+  created_at: string; // ISO 8601 UTC
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
 
 async function apiFetch<T>(
@@ -181,4 +190,29 @@ export async function getTicker(): Promise<TickerResponse> {
  */
 export async function healthCheck(): Promise<{ status: string }> {
   return apiFetch<{ status: string }>("/health");
+}
+
+/**
+ * GET /confessions/{id}/replies
+ * Public — returns all replies for a confession.
+ */
+export async function getReplies(confessionId: string): Promise<Reply[]> {
+  return apiFetch<Reply[]>(`/confessions/${confessionId}/replies`);
+}
+
+/**
+ * POST /confessions/{id}/replies
+ * Auth required — posts a non-anonymous reply.
+ */
+export async function postReply(
+  confessionId: string,
+  body: string,
+  displayName: string,
+  token: string
+): Promise<Reply> {
+  return apiFetch<Reply>(
+    `/confessions/${confessionId}/replies`,
+    { method: "POST", body: JSON.stringify({ body, display_name: displayName }) },
+    token
+  );
 }

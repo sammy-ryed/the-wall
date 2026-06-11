@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from datetime import datetime
 
 
 class ConfessionIn(BaseModel):
@@ -75,3 +76,30 @@ class ConfessionsResponse(BaseModel):
 class SessionRegister(BaseModel):
     """Payload to register an active session token."""
     session_token: str
+
+
+class ReplyIn(BaseModel):
+    """Payload to POST /confessions/{id}/replies."""
+    body: str = Field(..., min_length=1, max_length=280, description="Reply text, max 280 characters.")
+    display_name: str = Field(..., max_length=60, description="Replier's display name (email prefix or OAuth name).")
+
+
+class ReplyOut(BaseModel):
+    """A stored reply returned by GET/POST /confessions/{id}/replies."""
+    id: str
+    confession_id: str
+    user_id: str
+    display_name: str
+    body: str
+    created_at: str  # ISO 8601 UTC
+
+    @classmethod
+    def from_db_row(cls, row: dict) -> "ReplyOut":
+        return cls(
+            id=str(row["id"]),
+            confession_id=str(row["confession_id"]),
+            user_id=str(row["user_id"]),
+            display_name=row["display_name"],
+            body=row["body"],
+            created_at=row.get("created_at", ""),
+        )

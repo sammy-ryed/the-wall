@@ -16,6 +16,7 @@ from models import (
     ConfessionPost, ConfessionSubmit,
     StatsOut, ConfessionsResponse,
     SessionRegister,
+    ReplyIn, ReplyOut,
 )
 from roast import get_roast
 
@@ -105,6 +106,8 @@ def _now_iso() -> str:
 
 _confessions_memory: List[ConfessionPost] = []
 _active_sessions: dict[str, str] = {}
+# In-memory reply store: { confession_id: [ReplyOut, ...] }
+_replies_memory: dict[str, List[ReplyOut]] = {}
 
 # ---------------------------------------------------------------------------
 # DB helpers
@@ -314,6 +317,65 @@ def post_confession(
     user: dict = Depends(require_auth),
 ):
     return _db_insert(payload)
+
+
+# ---------------------------------------------------------------------------
+# Routes — Replies
+# ---------------------------------------------------------------------------
+
+@app.get("/confessions/{confession_id}/replies", response_model=List[ReplyOut])
+def get_replies(confession_id: str):
+    """Public — return all replies for a confession, oldest-first."""
+    if not _supabase:
+        return _replies_memory.get(confession_id, [])
+    try:
+        result = (
+            _supabase.table("replies")
+            .select("*")
+            .eq("confession_id", confession_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        return [ReplyOut.from_db_row(r) for r in (result.data or [])]
+    except Exception as e:
+        logger.error(f"DB get replies failed: {e}")
+        raise HTTPException(status_code=500, detail="Could not fetch replies.")
+
+
+@app.post("/confessions/{confession_id}/replies", response_model=ReplyOut, status_code=201)
+def post_reply(
+    confession_id: str,
+    payload: ReplyIn,
+    user: dict = Depends(require_auth),
+):
+    """Auth required — post a non-anonymous reply to a confession."""
+    if not payload.body.strip():
+        raise HTTPException(status_code=400, detail="Reply cannot be empty.")
+
+    if not _supabase:
+        reply = ReplyOut(
+            id=str(uuid.uuid4()),
+            confession_id=confession_id,
+            user_id=user["id"],
+            display_name=payload.display_name,
+            body=payload.body.strip(),
+            created_at=_now_iso(),
+        )
+        _replies_memory.setdefault(confession_id, []).append(reply)
+        return reply
+
+    try:
+        insert_data = {
+            "confession_id": confession_id,
+            "user_id": user["id"],
+            "display_name": payload.display_name,
+            "body": payload.body.strip(),
+        }
+        result = _supabase.table("replies").insert(insert_data).execute()
+        return ReplyOut.from_db_row(result.data[0])
+    except Exception as e:
+        logger.error(f"DB insert reply failed: {e}")
+        raise HTTPException(status_code=500, detail="Could not save reply.")
 
 # ---------------------------------------------------------------------------
 # Routes — Single-session enforcement
