@@ -82,11 +82,18 @@ export default function ConfessForm({ onPosted, user }: Props) {
     setErrorMsg("");
   }
 
-  const survColour =
-    roast && roast.survival_probability < 20
+  const cringeColour =
+    roast && roast.cringe_score >= 80
       ? "#d63a2a"
-      : roast && roast.survival_probability < 60
-      ? "#0a0a0a"
+      : roast && roast.cringe_score >= 50
+      ? "#b07d00"
+      : "#2a7a4b";
+
+  const survColour =
+    roast && roast.survival_probability <= 25
+      ? "#d63a2a"
+      : roast && roast.survival_probability <= 60
+      ? "#b07d00"
       : "#2a7a4b";
 
   return (
@@ -206,19 +213,47 @@ export default function ConfessForm({ onPosted, user }: Props) {
       {/* ── Result ──────────────────────────────────────── */}
       {phase === "result" && roast && (
         <div style={{ border: "1.5px solid #0a0a0a", padding: 14 }}>
-          {/* Scores */}
-          <div style={{ display: "flex", marginBottom: 12 }}>
-            <div style={{ flex: 1, padding: "10px 12px", textAlign: "center", borderRight: "1px solid #0a0a0a" }}>
-              <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: "#d63a2a" }}>
-                {roast.cringe_score}
-              </div>
-              <div style={{ fontSize: 9, fontFamily: "'Space Mono', monospace", color: "#8a8070", marginTop: 3, letterSpacing: "0.06em" }}>CRINGE SCORE</div>
+          {/* Header label */}
+          <div style={{
+            fontSize: 9, fontFamily: "'Space Mono', monospace",
+            color: "#8a8070", letterSpacing: "0.1em", marginBottom: 10,
+          }}>
+            RATED BY GROQ
+          </div>
+
+          {/* Cringe score */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+              <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: "#8a8070", letterSpacing: "0.06em" }}>CRINGE</span>
+              <span style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: cringeColour }}>
+                {roast.cringe_score}<span style={{ fontSize: 11, fontWeight: 400 }}>/100</span>
+              </span>
             </div>
-            <div style={{ flex: 1, padding: "10px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: survColour }}>
-                {roast.survival_probability}%
-              </div>
-              <div style={{ fontSize: 9, fontFamily: "'Space Mono', monospace", color: "#8a8070", marginTop: 3, letterSpacing: "0.06em" }}>SURVIVAL</div>
+            <div style={{ height: 3, background: "#d0c9be" }}>
+              <div style={{
+                height: 3,
+                width: `${roast.cringe_score}%`,
+                background: cringeColour,
+                transition: "width 0.6s ease-out",
+              }} />
+            </div>
+          </div>
+
+          {/* Survival rate */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+              <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: "#8a8070", letterSpacing: "0.06em" }}>SURVIVAL</span>
+              <span style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: survColour }}>
+                {roast.survival_probability}<span style={{ fontSize: 11, fontWeight: 400 }}>%</span>
+              </span>
+            </div>
+            <div style={{ height: 3, background: "#d0c9be" }}>
+              <div style={{
+                height: 3,
+                width: `${roast.survival_probability}%`,
+                background: survColour,
+                transition: "width 0.6s ease-out",
+              }} />
             </div>
           </div>
 
@@ -271,10 +306,12 @@ export default function ConfessForm({ onPosted, user }: Props) {
             onClick={handleTryAgain}
             style={{
               marginTop: 6, width: "100%", padding: 8, minHeight: 44,
-              border: "1px solid #d0c9be", background: "transparent",
+              border: "1.5px solid #0a0a0a", background: "transparent",
               fontFamily: "'Space Grotesk', sans-serif", fontSize: 12,
-              cursor: "pointer", color: "#8a8070",
+              cursor: "pointer", color: "#0a0a0a", transition: "all 0.1s",
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#0a0a0a"; e.currentTarget.style.color = "#f5f0e8"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#0a0a0a"; }}
           >
             start over
           </button>
