@@ -122,10 +122,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      // Run immediately so a kicked-out session is caught without waiting
-      check();
-
-      // Then poll every 20 seconds
+      // Poll every 20 seconds.
+      // NOTE: We do NOT call check() immediately here — callers are responsible
+      // for ensuring the nonce is registered in the backend before starting
+      // this loop, so the first poll at 20s is always safe.
       validateIntervalRef.current = setInterval(check, 20_000);
 
       // Also check on window focus AND tab visibility change
@@ -224,17 +224,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) return { error: error.message };
       if (!data.session) return { error: "No session returned." };
 
-      // Generate a fresh nonce for this login — always store it locally
-      // so enforcement works even if the backend is momentarily unreachable.
+      // Generate a fresh nonce for this login.
       const nonce = generateNonce();
       storeNonce(nonce, rememberMe);
 
-      // Best-effort: register with the backend. If it fails, local enforcement
-      // still works within the same browser. The next /validate-session call
-      // will reconcile once the backend is reachable.
-      registerSession(data.session.access_token, nonce).catch(() => {
-        // Intentionally fire-and-forget — don't block sign-in
-      });
+      // MUST await registration before starting the loop — the first
+      // visibility/focus-triggered check would otherwise race against the
+      // POST and see the stale nonce from a previous session in the DB,
+      // triggering a false "signed in from another device" kick.
+      try {
+        await registerSession(data.session.access_token, nonce);
+      } catch {
+        // Backend unreachable — stored nonce locally above; grace period
+        // (stored=null) will return "valid" until backend comes back.
+      }
 
       startValidationLoop(data.session, nonce);
 
