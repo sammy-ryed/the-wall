@@ -442,8 +442,11 @@ def validate_session(
         stored = _active_sessions.get(user["id"])
 
     if stored is None:
-        # No session registered yet — grace period (first login after restart)
-        return {"status": "valid"}
+        # No session registered yet — treat as invalid to enforce single-session
+        raise HTTPException(
+            status_code=401,
+            detail="Session invalidated. No active session registered."
+        )
     if stored != session_token:
         raise HTTPException(
             status_code=401,

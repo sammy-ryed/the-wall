@@ -192,13 +192,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, sess) => {
-        setSession(sess);
-        setUser(sess?.user ?? null);
-        if (!sess) {
-          clearNonce();
-          if (validateIntervalRef.current) clearInterval(validateIntervalRef.current);
-        }
+      (event, sess) => {
+          // Ignore token refresh events – they do not affect session validity
+          if (event === "TOKEN_REFRESHED") {
+            return;
+          }
+          setSession(sess);
+          setUser(sess?.user ?? null);
+          if (!sess) {
+            clearNonce();
+            if (validateIntervalRef.current) clearInterval(validateIntervalRef.current);
+          }
       }
     );
 
@@ -214,7 +218,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string, rememberMe: boolean) => {
       // Set remember-me flag BEFORE supabase call so custom storage picks it up
       if (typeof window !== "undefined") {
-        localStorage.setItem("wall_remember_me", rememberMe ? "true" : "false");
+        // Store the remember‑me flag in the appropriate storage based on the user's choice.
+        if (rememberMe) {
+          // Persist across tabs – use localStorage.
+          localStorage.setItem("wall_remember_me", "true");
+        } else {
+          // Do not persist – store the flag in sessionStorage so it is cleared when the tab closes.
+          sessionStorage.setItem("wall_remember_me", "false");
+        }
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -236,8 +247,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         await registerSession(data.session.access_token, nonce);
       } catch {
-        // Backend unreachable — stored nonce locally above; grace period
-        // (stored=null) will return "valid" until backend comes back.
+        // Registration failed – clear any remember‑me flag that was set.
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("wall_remember_me");
+          sessionStorage.removeItem("wall_remember_me");
+        }
+        // Continue without re‑throwing; the validation loop will treat the session as invalid.
       }
 
       startValidationLoop(data.session, nonce);
