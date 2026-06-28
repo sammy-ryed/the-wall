@@ -15,7 +15,10 @@ const rememberMeStorage =
   typeof window !== "undefined"
     ? {
         getItem: (key: string): string | null => {
-          const remember = localStorage.getItem("wall_remember_me");
+          // Retrieve the remember‑me flag from either storage location.
+          const rememberLocal = localStorage.getItem("wall_remember_me");
+          const rememberSession = sessionStorage.getItem("wall_remember_me");
+          const remember = rememberLocal ?? rememberSession;
           return remember === "true"
             ? localStorage.getItem(key)
             : sessionStorage.getItem(key);
