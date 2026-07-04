@@ -1,18 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { roastConfession, postConfession, type RoastResponse, type Confession } from "@/lib/api";
-import { createClient } from "@/lib/supabase";
+import { useAuth } from "@/components/AuthProvider";
 
 interface Props {
   onPosted: (c: Confession) => void;
-  user: User;
+  user: any;
 }
 
 type Phase = "form" | "loading" | "result" | "error";
 
 export default function ConfessForm({ onPosted, user }: Props) {
+  const { session } = useAuth();
   const [text, setText] = useState("");
   const [isAnon, setIsAnon] = useState(false);
   const [phase, setPhase] = useState<Phase>("form");
@@ -34,9 +34,7 @@ export default function ConfessForm({ onPosted, user }: Props) {
 
     try {
       // Attach auth token so backend can verify the user
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const result = await roastConfession(text.trim(), session?.access_token);
+      const result = await roastConfession(text.trim(), session?.accessToken);
       setRoast(result);
       setPhase("result");
     } catch (e) {
@@ -50,8 +48,6 @@ export default function ConfessForm({ onPosted, user }: Props) {
     if (!roast) return;
     setPosting(true);
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
       const posted = await postConfession(
         {
           name: postName,
@@ -63,7 +59,7 @@ export default function ConfessForm({ onPosted, user }: Props) {
           era: roast.era,
           target_name: roast.target_name ?? null,
         },
-        session?.access_token
+        session?.accessToken
       );
       onPosted(posted);
       setText("");

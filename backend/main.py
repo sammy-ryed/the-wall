@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
+import jwt
 
 load_dotenv()
 
@@ -19,6 +20,9 @@ from models import (
     ReplyIn, ReplyOut,
 )
 from roast import get_roast
+from database import SessionLocal, ConfessionModel, ReplyModel, ActiveSessionModel
+from sqlalchemy.orm import Session
+from sqlalchemy import desc
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +31,16 @@ app = FastAPI(
     description="Anonymous confession & roast machine — backend API.",
     version="3.0.0"
 )
+
+# ---------------------------------------------------------------------------
+# Dependency
+# ---------------------------------------------------------------------------
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # ---------------------------------------------------------------------------
 # CORS
@@ -46,39 +60,22 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------------
-# Supabase admin client
-# ---------------------------------------------------------------------------
-_supabase_url = os.getenv("SUPABASE_URL", "")
-_supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-
-_supabase = None
-try:
-    if _supabase_url and _supabase_service_key:
-        from supabase import create_client
-        _supabase = create_client(_supabase_url, _supabase_service_key)
-        logger.info("Supabase client initialised — using persistent DB storage.")
-    else:
-        logger.warning("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set. Falling back to in-memory storage.")
-except Exception as e:
-    logger.warning(f"Supabase init failed: {e}. Falling back to in-memory storage.")
-
-# ---------------------------------------------------------------------------
 # JWT verification
 # ---------------------------------------------------------------------------
 security = HTTPBearer(auto_error=False)
-
+NEXTAUTH_SECRET = os.getenv("NEXTAUTH_SECRET", "fallback_secret_for_local_dev_change_in_prod")
 
 def _verify_jwt(token: str) -> Optional[dict]:
-    if not _supabase:
-        return {"id": "dev-user", "email": "dev@localhost"}
     try:
-        resp = _supabase.auth.get_user(token)
-        if resp.user:
-            return {"id": resp.user.id, "email": resp.user.email}
+        # We assume NextAuth is configured to issue raw JWS (HS256)
+        decoded = jwt.decode(token, NEXTAUTH_SECRET, algorithms=["HS256"])
+        user_id = decoded.get("sub") or decoded.get("email")
+        if not user_id:
+            return None
+        return {"id": user_id, "email": decoded.get("email", "")}
     except Exception as e:
         logger.warning(f"JWT verify failed: {e}")
     return None
-
 
 def verify_token(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
     if not credentials:
@@ -88,7 +85,6 @@ def verify_token(credentials: Optional[HTTPAuthorizationCredentials] = Depends(s
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
     return user
 
-
 def require_auth(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
     user = verify_token(credentials)
     if not user:
@@ -96,149 +92,8 @@ def require_auth(credentials: Optional[HTTPAuthorizationCredentials] = Depends(s
     return user
 
 
-# ---------------------------------------------------------------------------
-# In-memory store — fallback when Supabase is not configured
-# No seed data. Wall starts empty and fills with real confessions.
-# ---------------------------------------------------------------------------
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-_confessions_memory: List[ConfessionPost] = []
-_active_sessions: dict[str, str] = {}
-# In-memory reply store: { confession_id: [ReplyOut, ...] }
-_replies_memory: dict[str, List[ReplyOut]] = {}
-
-# ---------------------------------------------------------------------------
-# DB helpers
-# ---------------------------------------------------------------------------
-
-def _db_list(sort: str, page: int, per_page: int) -> Tuple[List[ConfessionPost], int]:
-    """Read paginated confessions. Falls back to in-memory if no Supabase."""
-    if not _supabase:
-        if sort == "cringe":
-            ordered = sorted(_confessions_memory, key=lambda c: c.cringe_score, reverse=True)
-        else:
-            ordered = list(_confessions_memory)
-        total = len(ordered)
-        start = (page - 1) * per_page
-        return ordered[start:start + per_page], total
-
-    try:
-        order_col = "cringe_score" if sort == "cringe" else "created_at"
-        start = (page - 1) * per_page
-        end = start + per_page - 1
-        result = (
-            _supabase.table("confessions")
-            .select("*", count="exact")
-            .order(order_col, desc=True)
-            .range(start, end)
-            .execute()
-        )
-        items = [ConfessionPost.from_db_row(r) for r in result.data]
-        return items, result.count or 0
-    except Exception as e:
-        logger.error(f"DB list failed: {e}")
-        raise HTTPException(status_code=500, detail="Could not fetch confessions.")
-
-
-def _db_leaderboard(limit: int) -> List[ConfessionPost]:
-    if not _supabase:
-        return sorted(_confessions_memory, key=lambda c: c.cringe_score, reverse=True)[:limit]
-    try:
-        result = (
-            _supabase.table("confessions")
-            .select("*")
-            .order("cringe_score", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        return [ConfessionPost.from_db_row(r) for r in result.data]
-    except Exception as e:
-        logger.error(f"DB leaderboard failed: {e}")
-        return []
-
-
-def _db_insert(payload: ConfessionSubmit) -> ConfessionPost:
-    if not _supabase:
-        entry = ConfessionPost(
-            id=str(uuid.uuid4()),
-            name=payload.name or "Anonymous",
-            confession=payload.confession,
-            cringe_score=payload.cringe_score,
-            survival_probability=payload.survival_probability,
-            roast=payload.roast,
-            verdict=payload.verdict,
-            era=payload.era,
-            timestamp=_now_iso(),
-            target_name=payload.target_name,
-        )
-        _confessions_memory.insert(0, entry)
-        return entry
-
-    try:
-        insert_data = {
-            "name": payload.name or "Anonymous",
-            "confession": payload.confession,
-            "cringe_score": payload.cringe_score,
-            "survival_probability": payload.survival_probability,
-            "roast": payload.roast,
-            "verdict": payload.verdict,
-            "era": payload.era,
-            "target_name": payload.target_name,
-        }
-        result = _supabase.table("confessions").insert(insert_data).execute()
-        return ConfessionPost.from_db_row(result.data[0])
-    except Exception as e:
-        logger.error(f"DB insert failed: {e}")
-        raise HTTPException(status_code=500, detail="Could not save confession.")
-
-
-def _db_stats() -> StatsOut:
-    if not _supabase:
-        items = _confessions_memory
-    else:
-        try:
-            result = _supabase.table("confessions").select("cringe_score,survival_probability,era,name").execute()
-            items_raw = result.data or []
-            # Build lightweight objects for stats
-            class _C:
-                def __init__(self, r):
-                    self.cringe_score = r["cringe_score"]
-                    self.survival_probability = r["survival_probability"]
-                    self.era = r["era"]
-                    self.name = r["name"]
-            items = [_C(r) for r in items_raw]
-        except Exception as e:
-            logger.error(f"DB stats failed: {e}")
-            items = []
-
-    total = len(items)
-    if total == 0:
-        return StatsOut(total_confessions=0, avg_cringe=0.0, lowest_survival=100, most_common_era="—", anon_percent=0.0)
-
-    avg_cringe = round(sum(c.cringe_score for c in items) / total, 1)
-    lowest_survival = min(c.survival_probability for c in items)
-    most_common_era = Counter(c.era for c in items).most_common(1)[0][0]
-    anon_count = sum(1 for c in items if c.name.strip().lower() in ("anonymous", "anonymous coward", "anon", ""))
-    anon_percent = round((anon_count / total) * 100, 1)
-    return StatsOut(total_confessions=total, avg_cringe=avg_cringe, lowest_survival=lowest_survival, most_common_era=most_common_era, anon_percent=anon_percent)
-
-
-def _db_ticker() -> List[ConfessionPost]:
-    if not _supabase:
-        return _confessions_memory[:8]
-    try:
-        result = (
-            _supabase.table("confessions")
-            .select("name,cringe_score,verdict")
-            .order("created_at", desc=True)
-            .limit(8)
-            .execute()
-        )
-        return result.data or []
-    except Exception:
-        return []
 
 # ---------------------------------------------------------------------------
 # Routes — Public
@@ -246,12 +101,12 @@ def _db_ticker() -> List[ConfessionPost]:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "2.2.0", "db": "supabase" if _supabase else "memory"}
+    return {"status": "ok", "version": "3.0.0", "db": "mysql"}
 
 
 @app.get("/")
 def root():
-    return {"status": "online", "message": "The Wall API v2.2 — Groq roasts, Supabase storage."}
+    return {"status": "online", "message": "The Wall API v3.0 — Groq roasts, MySQL storage."}
 
 
 @app.get("/confessions", response_model=ConfessionsResponse)
@@ -259,37 +114,73 @@ def list_confessions(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
     sort: str = Query(default="new", pattern="^(new|cringe)$"),
+    db: Session = Depends(get_db)
 ):
-    items, total = _db_list(sort, page, per_page)
-    return ConfessionsResponse(confessions=items, total=total, page=page, per_page=per_page)
+    order_col = desc(ConfessionModel.cringe_score) if sort == "cringe" else desc(ConfessionModel.created_at)
+    start = (page - 1) * per_page
+    
+    total = db.query(ConfessionModel).count()
+    items = db.query(ConfessionModel).order_by(order_col).offset(start).limit(per_page).all()
+    
+    confessions_out = []
+    for item in items:
+        d = item.__dict__.copy()
+        if 'created_at' in d and d['created_at']:
+            d['timestamp'] = d['created_at'].isoformat()
+        else:
+            d['timestamp'] = _now_iso()
+        confessions_out.append(ConfessionPost(**d))
+        
+    return ConfessionsResponse(confessions=confessions_out, total=total, page=page, per_page=per_page)
 
 
 @app.get("/confessions/leaderboard", response_model=list)
-def leaderboard(limit: int = Query(default=3, ge=1, le=10)):
-    items = _db_leaderboard(limit)
-    return [c.model_dump() for c in items]
+def leaderboard(limit: int = Query(default=3, ge=1, le=10), db: Session = Depends(get_db)):
+    items = db.query(ConfessionModel).order_by(desc(ConfessionModel.cringe_score)).limit(limit).all()
+    out = []
+    for item in items:
+        d = item.__dict__.copy()
+        if 'created_at' in d and d['created_at']:
+            d['timestamp'] = d['created_at'].isoformat()
+        else:
+            d['timestamp'] = _now_iso()
+        out.append(ConfessionPost(**d).model_dump())
+    return out
 
 
 @app.get("/stats", response_model=StatsOut)
-def get_stats():
-    return _db_stats()
+def get_stats(db: Session = Depends(get_db)):
+    items = db.query(
+        ConfessionModel.cringe_score, 
+        ConfessionModel.survival_probability, 
+        ConfessionModel.era, 
+        ConfessionModel.name
+    ).all()
+    
+    total = len(items)
+    if total == 0:
+        return StatsOut(total_confessions=0, avg_cringe=0.0, lowest_survival=100, most_common_era="—", anon_percent=0.0)
+
+    avg_cringe = round(sum(c.cringe_score for c in items) / total, 1)
+    lowest_survival = min(c.survival_probability for c in items)
+    
+    era_counts = Counter(c.era for c in items)
+    most_common_era = era_counts.most_common(1)[0][0] if era_counts else "—"
+    
+    anon_count = sum(1 for c in items if (c.name or "").strip().lower() in ("anonymous", "anonymous coward", "anon", ""))
+    anon_percent = round((anon_count / total) * 100, 1)
+    
+    return StatsOut(total_confessions=total, avg_cringe=avg_cringe, lowest_survival=lowest_survival, most_common_era=most_common_era, anon_percent=anon_percent)
 
 
 @app.get("/ticker")
-def get_ticker():
-    recent = _db_ticker()
+def get_ticker(db: Session = Depends(get_db)):
+    recent = db.query(ConfessionModel.name, ConfessionModel.cringe_score, ConfessionModel.verdict).order_by(desc(ConfessionModel.created_at)).limit(8).all()
     parts = []
     for c in recent:
-        if isinstance(c, dict):
-            name = c.get("name", "ANON").upper()
-            score = c.get("cringe_score", 0)
-            verdict = c.get("verdict", "???")
-        else:
-            name = c.name.upper()
-            score = c.cringe_score
-            verdict = c.verdict
-        parts.append(f"{name} scored {score} cringe")
-        parts.append(f"{name}: \"{verdict}\"")
+        name = (c.name or "ANON").upper()
+        parts.append(f"{name} scored {c.cringe_score} cringe")
+        parts.append(f"{name}: \"{c.verdict}\"")
     parts.append("YOUR CONFESSION IS NEXT")
     ticker_text = "    ///    ".join(parts)
     return {"text": f"    {ticker_text}    ///    {ticker_text}    "}
@@ -315,31 +206,46 @@ def roast_confession(
 def post_confession(
     payload: ConfessionSubmit,
     user: dict = Depends(require_auth),
+    db: Session = Depends(get_db)
 ):
-    return _db_insert(payload)
+    new_id = str(uuid.uuid4())
+    db_item = ConfessionModel(
+        id=new_id,
+        name=payload.name or "Anonymous",
+        confession=payload.confession,
+        cringe_score=payload.cringe_score,
+        survival_probability=payload.survival_probability,
+        roast=payload.roast,
+        verdict=payload.verdict,
+        era=payload.era,
+        target_name=payload.target_name,
+    )
+    try:
+        db.add(db_item)
+        db.commit()
+        db.refresh(db_item)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"DB insert failed: {e}")
+        raise HTTPException(status_code=500, detail="Could not save confession.")
 
+    d = db_item.__dict__.copy()
+    d['timestamp'] = db_item.created_at.isoformat()
+    return ConfessionPost(**d)
 
 # ---------------------------------------------------------------------------
 # Routes — Replies
 # ---------------------------------------------------------------------------
 
 @app.get("/confessions/{confession_id}/replies", response_model=List[ReplyOut])
-def get_replies(confession_id: str):
-    """Public — return all replies for a confession, oldest-first."""
-    if not _supabase:
-        return _replies_memory.get(confession_id, [])
-    try:
-        result = (
-            _supabase.table("replies")
-            .select("*")
-            .eq("confession_id", confession_id)
-            .order("created_at", desc=False)
-            .execute()
-        )
-        return [ReplyOut.from_db_row(r) for r in (result.data or [])]
-    except Exception as e:
-        logger.error(f"DB get replies failed: {e}")
-        raise HTTPException(status_code=500, detail="Could not fetch replies.")
+def get_replies(confession_id: str, db: Session = Depends(get_db)):
+    items = db.query(ReplyModel).filter(ReplyModel.confession_id == confession_id).order_by(ReplyModel.created_at).all()
+    out = []
+    for item in items:
+        d = item.__dict__.copy()
+        d['created_at'] = item.created_at.isoformat()
+        out.append(ReplyOut(**d))
+    return out
 
 
 @app.post("/confessions/{confession_id}/replies", response_model=ReplyOut, status_code=201)
@@ -347,35 +253,35 @@ def post_reply(
     confession_id: str,
     payload: ReplyIn,
     user: dict = Depends(require_auth),
+    db: Session = Depends(get_db)
 ):
-    """Auth required — post a non-anonymous reply to a confession."""
     if not payload.body.strip():
         raise HTTPException(status_code=400, detail="Reply cannot be empty.")
+    
+    conf = db.query(ConfessionModel).filter(ConfessionModel.id == confession_id).first()
+    if not conf:
+        raise HTTPException(status_code=404, detail="Confession not found.")
 
-    if not _supabase:
-        reply = ReplyOut(
-            id=str(uuid.uuid4()),
-            confession_id=confession_id,
-            user_id=user["id"],
-            display_name=payload.display_name,
-            body=payload.body.strip(),
-            created_at=_now_iso(),
-        )
-        _replies_memory.setdefault(confession_id, []).append(reply)
-        return reply
-
+    new_id = str(uuid.uuid4())
+    db_item = ReplyModel(
+        id=new_id,
+        confession_id=confession_id,
+        user_id=user["id"],
+        display_name=payload.display_name,
+        body=payload.body.strip()
+    )
     try:
-        insert_data = {
-            "confession_id": confession_id,
-            "user_id": user["id"],
-            "display_name": payload.display_name,
-            "body": payload.body.strip(),
-        }
-        result = _supabase.table("replies").insert(insert_data).execute()
-        return ReplyOut.from_db_row(result.data[0])
+        db.add(db_item)
+        db.commit()
+        db.refresh(db_item)
     except Exception as e:
+        db.rollback()
         logger.error(f"DB insert reply failed: {e}")
         raise HTTPException(status_code=500, detail="Could not save reply.")
+
+    d = db_item.__dict__.copy()
+    d['created_at'] = db_item.created_at.isoformat()
+    return ReplyOut(**d)
 
 # ---------------------------------------------------------------------------
 # Routes — Single-session enforcement
@@ -385,26 +291,19 @@ def post_reply(
 def register_session(
     payload: SessionRegister,
     user: dict = Depends(require_auth),
+    db: Session = Depends(get_db)
 ):
-    """
-    Called immediately after login.
-    Upserts the session token into Supabase active_sessions (or in-memory fallback).
-    Any existing session for this user_id is overwritten — kicking out the old device.
-    """
-    if _supabase:
-        try:
-            _supabase.table("active_sessions").upsert({
-                "user_id": user["id"],
-                "session_token": payload.session_token,
-                "updated_at": _now_iso(),
-            }).execute()
-            # Also mirror to memory so validate_session can fall back consistently
-            _active_sessions[user["id"]] = payload.session_token
-        except Exception as e:
-            logger.warning(f"Session DB upsert failed, falling back to memory: {e}")
-            _active_sessions[user["id"]] = payload.session_token
+    item = db.query(ActiveSessionModel).filter(ActiveSessionModel.user_id == user["id"]).first()
+    if item:
+        item.session_token = payload.session_token
     else:
-        _active_sessions[user["id"]] = payload.session_token
+        item = ActiveSessionModel(user_id=user["id"], session_token=payload.session_token)
+        db.add(item)
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Session DB upsert failed: {e}")
     return {"status": "ok"}
 
 
@@ -412,42 +311,15 @@ def register_session(
 def validate_session(
     session_token: str = Query(...),
     user: dict = Depends(require_auth),
+    db: Session = Depends(get_db)
 ):
-    """
-    Called every 20s + on visibility/focus change by the frontend.
-    Returns 200 if this session is still the active one, 401 if another device logged in.
-    Persisted in Supabase so it survives backend restarts.
-    """
-    stored: Optional[str] = None
-
-    if _supabase:
-        try:
-            result = (
-                _supabase.table("active_sessions")
-                .select("session_token")
-                .eq("user_id", user["id"])
-                .maybe_single()
-                .execute()
-            )
-            if result.data:
-                stored = result.data.get("session_token")
-            else:
-                # Row missing in DB (e.g. upsert previously failed) —
-                # fall back to in-memory mirror which is always written.
-                stored = _active_sessions.get(user["id"])
-        except Exception as e:
-            logger.warning(f"Session DB read failed, falling back to memory: {e}")
-            stored = _active_sessions.get(user["id"])
-    else:
-        stored = _active_sessions.get(user["id"])
-
-    if stored is None:
-        # No session registered yet — treat as invalid to enforce single-session
+    item = db.query(ActiveSessionModel).filter(ActiveSessionModel.user_id == user["id"]).first()
+    if not item:
         raise HTTPException(
             status_code=401,
             detail="Session invalidated. No active session registered."
         )
-    if stored != session_token:
+    if item.session_token != session_token:
         raise HTTPException(
             status_code=401,
             detail="Session invalidated. Another device has signed in."
