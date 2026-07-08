@@ -26,13 +26,12 @@ export default function TheWall() {
   const [meta, setMeta] = useState<Omit<ConfessionsResponse, "confessions"> | null>(null);
   const [sort, setSort] = useState<SortMode>("new");
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [shameKey, setShameKey] = useState(0);
   const [apiStatus, setApiStatus] = useState<"ok" | "error" | "checking">("checking");
   const [mobileTab, setMobileTab] = useState<"feed" | "confess">("feed");
 
-  const PER_PAGE = 20;
+  const PER_PAGE = 10;
 
   // ── Health check ──────────────────────────────────────────────
   useEffect(() => {
@@ -43,17 +42,16 @@ export default function TheWall() {
 
   // ── Load confessions ──────────────────────────────────────────
   const fetchConfessions = useCallback(
-    async (newSort: SortMode, newPage: number, append: boolean) => {
-      if (newPage === 1) setLoading(true); else setLoadingMore(true);
+    async (newSort: SortMode, newPage: number) => {
+      setLoading(true);
       try {
         const data = await listConfessions(newSort, newPage, PER_PAGE);
         setMeta({ total: data.total, page: data.page, per_page: data.per_page });
-        setConfessions((prev) => (append ? [...prev, ...data.confessions] : data.confessions));
+        setConfessions(data.confessions);
       } catch {
         // keep existing state on error
       } finally {
         setLoading(false);
-        setLoadingMore(false);
       }
     },
     []
@@ -61,7 +59,7 @@ export default function TheWall() {
 
   useEffect(() => {
     setPage(1);
-    fetchConfessions(sort, 1, false);
+    fetchConfessions(sort, 1);
   }, [sort, fetchConfessions]);
 
   function changeSort(s: SortMode) {
@@ -69,20 +67,28 @@ export default function TheWall() {
     setSort(s);
   }
 
-  function loadMore() {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchConfessions(sort, nextPage, true);
+  function goToPage(p: number) {
+    if (p === page) return;
+    setPage(p);
+    fetchConfessions(sort, p);
   }
 
   function handlePosted(c: Confession) {
     setSort("new");
-    setConfessions((prev) => [c, ...prev]);
+    setPage(1);
+    fetchConfessions("new", 1);
     setShameKey((k) => k + 1);
     setMobileTab("feed");
   }
 
-  const hasMore = meta ? confessions.length < meta.total : false;
+  const totalPages = meta ? Math.ceil(meta.total / meta.per_page) : 0;
+
+  function getPageNumbers(current: number, total: number) {
+    if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current <= 3) return [1, 2, 3, 4, 5, '...', total];
+    if (current >= total - 2) return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+    return [1, '...', current - 1, current, current + 1, '...', total];
+  }
 
   const sortBtnStyle = (active: boolean): React.CSSProperties => ({
     fontSize: 10, fontFamily: "'Space Mono', monospace",
@@ -324,21 +330,52 @@ export default function TheWall() {
             confessions.map((c) => <ConfessionCard key={c.id} item={c} />)
           )}
 
-          {/* Load more */}
-          {!loading && hasMore && (
-            <div style={{ padding: 16, textAlign: "center", borderTop: "1px solid #d0c9be" }}>
+          {/* Pagination */}
+          {!loading && totalPages > 1 && (
+            <div style={{ padding: 16, display: "flex", justifyContent: "center", alignItems: "center", gap: 8, borderTop: "1px solid #d0c9be", flexWrap: "wrap" }}>
               <button
-                onClick={loadMore}
-                disabled={loadingMore}
+                onClick={() => goToPage(Math.max(1, page - 1))}
+                disabled={page === 1}
                 style={{
-                  padding: "8px 24px", border: "1.5px solid #0a0a0a",
-                  background: "transparent", fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: 12, cursor: loadingMore ? "wait" : "pointer", color: "#0a0a0a",
+                  padding: "4px 10px", border: "1.5px solid #0a0a0a",
+                  background: "transparent", color: page === 1 ? "#8a8070" : "#0a0a0a",
+                  borderColor: page === 1 ? "#8a8070" : "#0a0a0a",
+                  fontFamily: "'Space Mono', monospace", fontSize: 12, cursor: page === 1 ? "not-allowed" : "pointer",
                 }}
-                onMouseEnter={(e) => { if (!loadingMore) { e.currentTarget.style.background = "#0a0a0a"; e.currentTarget.style.color = "#f5f0e8"; }}}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#0a0a0a"; }}
               >
-                {loadingMore ? "loading..." : `load more (${meta!.total - confessions.length} remaining)`}
+                PREV
+              </button>
+              
+              {getPageNumbers(page, totalPages).map((p, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => typeof p === 'number' && goToPage(p)}
+                  disabled={p === '...'}
+                  style={{
+                    padding: "4px 10px", border: p === '...' ? "none" : "1.5px solid #0a0a0a",
+                    background: p === page ? "#0a0a0a" : "transparent",
+                    color: p === page ? "#f5f0e8" : "#0a0a0a",
+                    fontFamily: "'Space Mono', monospace", fontSize: 12, 
+                    cursor: p === '...' ? "default" : "pointer",
+                  }}
+                  onMouseEnter={(e) => { if (typeof p === 'number' && p !== page) { e.currentTarget.style.background = "#0a0a0a"; e.currentTarget.style.color = "#f5f0e8"; }}}
+                  onMouseLeave={(e) => { if (typeof p === 'number' && p !== page) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#0a0a0a"; }}}
+                >
+                  {p}
+                </button>
+              ))}
+
+              <button
+                onClick={() => goToPage(Math.min(totalPages, page + 1))}
+                disabled={page === totalPages}
+                style={{
+                  padding: "4px 10px", border: "1.5px solid #0a0a0a",
+                  background: "transparent", color: page === totalPages ? "#8a8070" : "#0a0a0a",
+                  borderColor: page === totalPages ? "#8a8070" : "#0a0a0a",
+                  fontFamily: "'Space Mono', monospace", fontSize: 12, cursor: page === totalPages ? "not-allowed" : "pointer",
+                }}
+              >
+                NEXT
               </button>
             </div>
           )}

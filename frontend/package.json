@@ -12,17 +12,19 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next-auth": "^4.24.7",
+    "@supabase/supabase-js": "^2.110.1",
     "clsx": "^2.1.1",
     "framer-motion": "^11.1.7",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.378.0",
     "next": "^16.2.7",
-    "jsonwebtoken": "^9.0.2",
+    "next-auth": "^4.24.7",
     "react": "^18",
     "react-dom": "^18",
     "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
