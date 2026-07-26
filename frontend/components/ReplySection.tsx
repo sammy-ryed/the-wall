@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import type { Reply } from "@/lib/api";
-import { getReplies, postReply, formatTimestamp } from "@/lib/api";
+import { formatTimestamp } from "@/lib/api";
+import { useConfessionReplies, usePostReply } from "@/lib/reactQuery";
 import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
 
@@ -113,45 +114,31 @@ export default function ReplySection({ confessionId }: Props) {
   const { user, session, isVerified } = useAuth();
 
   const [open, setOpen] = useState(false);
-  const [replies, setReplies] = useState<Reply[]>([]);
-  const [loadingReplies, setLoadingReplies] = useState(false);
-  const [replyCount, setReplyCount] = useState<number | null>(null);
+  const { data, isFetching, isError, error: queryError, fetchNextPage, hasNextPage } = useConfessionReplies(confessionId);
+  const allReplies = data?.pages.flat() ?? [];
+  const replyCount = allReplies.length;
 
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const hasFetched = useRef(false);
+  // const hasFetched = useRef(false); // no longer needed with React Query
 
-  // Fetch replies when page loads
-  useEffect(() => {
-    if (hasFetched.current) return;
-    hasFetched.current = true;
-
-    setLoadingReplies(true);
-    getReplies(confessionId)
-      .then((data) => {
-        setReplies(data);
-        setReplyCount(data.length);
-      })
-      .catch(() => setError("couldn't load replies"))
-      .finally(() => setLoadingReplies(false));
-  }, [confessionId]);
+  // No manual effect needed; useConfessionReplies handles fetching.
 
   // Derive display name from logged-in user
   const displayName = user ? getDisplayName(user as Parameters<typeof getDisplayName>[0]) : "";
 
+  const postMutation = usePostReply(confessionId, session?.access_token);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!body.trim() || !session?.access_token) return;
-
     setSubmitting(true);
     setError(null);
     try {
-      const newReply = await postReply(confessionId, body.trim(), displayName, session.access_token);
-      setReplies((prev) => [...prev, newReply]);
-      setReplyCount((c) => (c ?? 0) + 1);
+      await postMutation.mutateAsync({ body: body.trim(), displayName });
       setBody("");
       inputRef.current?.focus();
     } catch {
@@ -195,11 +182,9 @@ export default function ReplySection({ confessionId }: Props) {
         onMouseLeave={(e) => (e.currentTarget.style.color = "#8a8070")}
       >
         <span style={{ fontSize: 11 }}>{open ? "▲" : "▼"}</span>
-        {count === 0 && !hasFetched.current
+        {count === 0
           ? "reply"
-          : count === 0
-            ? "no replies yet"
-            : `${count} ${count === 1 ? "reply" : "replies"}`}
+          : `${count} ${count === 1 ? "reply" : "replies"}`}
         {!open && count > 0 && (
           <span
             style={{
@@ -261,7 +246,7 @@ export default function ReplySection({ confessionId }: Props) {
           </div>
 
           {/* Reply list */}
-          {loadingReplies ? (
+          {isFetching ? (
             <div
               style={{
                 padding: "14px",
@@ -272,7 +257,7 @@ export default function ReplySection({ confessionId }: Props) {
             >
               loading...
             </div>
-          ) : replies.length === 0 ? (
+          ) : allReplies.length === 0 ? (
             <div
               style={{
                 padding: "14px",
@@ -285,11 +270,29 @@ export default function ReplySection({ confessionId }: Props) {
               no replies yet — be the first
             </div>
           ) : (
-            <div>
-              {replies.map((r) => (
-                <ReplyBubble key={r.id} reply={r} />
-              ))}
-            </div>
+            <>
+              <div>
+                {allReplies.map((r) => (
+                  <ReplyBubble key={r.id} reply={r} />
+                ))}
+              </div>
+              {hasNextPage && (
+                <button
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetching}
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    background: "#0a0a0a",
+                    color: "#f5f0e8",
+                    border: "none",
+                    cursor: isFetching ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {isFetching ? "Loading..." : "Load more"}
+                </button>
+              )}
+            </>
           )}
 
           {/* Error */}

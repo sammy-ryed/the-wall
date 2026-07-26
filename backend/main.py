@@ -24,6 +24,9 @@ from database import SessionLocal, ConfessionModel, ReplyModel, ActiveSessionMod
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
+# Redis caching utilities
+from redis_cache_decorator import redis_cache, invalidate_cache
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -110,6 +113,7 @@ def root():
 
 
 @app.get("/confessions", response_model=ConfessionsResponse)
+@redis_cache(ttl=120)
 def list_confessions(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
@@ -135,6 +139,7 @@ def list_confessions(
 
 
 @app.get("/confessions/leaderboard", response_model=list)
+@redis_cache(ttl=300)
 def leaderboard(limit: int = Query(default=3, ge=1, le=10), db: Session = Depends(get_db)):
     items = db.query(ConfessionModel).order_by(desc(ConfessionModel.cringe_score)).limit(limit).all()
     out = []
@@ -149,6 +154,7 @@ def leaderboard(limit: int = Query(default=3, ge=1, le=10), db: Session = Depend
 
 
 @app.get("/stats", response_model=StatsOut)
+@redis_cache(ttl=300)
 def get_stats(db: Session = Depends(get_db)):
     items = db.query(
         ConfessionModel.cringe_score, 
@@ -174,6 +180,7 @@ def get_stats(db: Session = Depends(get_db)):
 
 
 @app.get("/ticker")
+@redis_cache(ttl=300)
 def get_ticker(db: Session = Depends(get_db)):
     recent = db.query(ConfessionModel.name, ConfessionModel.cringe_score, ConfessionModel.verdict).order_by(desc(ConfessionModel.created_at)).limit(8).all()
     parts = []
@@ -229,6 +236,12 @@ def post_confession(
         logger.error(f"DB insert failed: {e}")
         raise HTTPException(status_code=500, detail="Could not save confession.")
 
+    # Invalidate caches after a new confession is added
+    invalidate_cache("list_confessions*")
+    invalidate_cache("leaderboard*")
+    invalidate_cache("get_stats*")
+    invalidate_cache("get_ticker*")
+
     d = db_item.__dict__.copy()
     d['timestamp'] = db_item.created_at.isoformat()
     return ConfessionPost(**d)
@@ -238,8 +251,16 @@ def post_confession(
 # ---------------------------------------------------------------------------
 
 @app.get("/confessions/{confession_id}/replies", response_model=List[ReplyOut])
-def get_replies(confession_id: str, db: Session = Depends(get_db)):
-    items = db.query(ReplyModel).filter(ReplyModel.confession_id == confession_id).order_by(ReplyModel.created_at).all()
+@redis_cache(ttl=120)
+def get_replies(
+    confession_id: str,
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    query = db.query(ReplyModel).filter(ReplyModel.confession_id == confession_id).order_by(ReplyModel.created_at)
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
     out = []
     for item in items:
         d = item.__dict__.copy()
@@ -278,6 +299,9 @@ def post_reply(
         db.rollback()
         logger.error(f"DB insert reply failed: {e}")
         raise HTTPException(status_code=500, detail="Could not save reply.")
+
+    # Invalidate cached replies for this confession after a new reply is added
+    invalidate_cache(f"get_replies:{confession_id}*")
 
     d = db_item.__dict__.copy()
     d['created_at'] = db_item.created_at.isoformat()

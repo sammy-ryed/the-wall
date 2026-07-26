@@ -1,24 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getStats, type WallStats } from "@/lib/api";
+import { useStats } from "@/lib/reactQuery";
 
 export default function StatsBox() {
-  const [stats, setStats] = useState<WallStats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchStats = () => {
-    getStats()
-      .then((s) => { setStats(s); setLoading(false); })
-      .catch(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    fetchStats();
-    // Refresh every 60 seconds
-    const interval = setInterval(fetchStats, 60_000);
-    return () => clearInterval(interval);
-  }, []);
+  const { data: stats, isLoading: loading } = useStats();
 
   const rows = stats
     ? [

@@ -4,10 +4,10 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  listConfessions,
   type Confession,
   type ConfessionsResponse,
 } from "@/lib/api";
+import { useConfessions } from "@/lib/reactQuery";
 import ConfessionCard from "@/components/ConfessionCard";
 import ConfessForm from "@/components/ConfessForm";
 import LoginPrompt from "@/components/LoginPrompt";
@@ -22,12 +22,8 @@ type SortMode = "new" | "cringe";
 export default function TheWall() {
   const { user, isVerified, signOut, loading: authLoading } = useAuth();
 
-  const [confessions, setConfessions] = useState<Confession[]>([]);
-  const [meta, setMeta] = useState<Omit<ConfessionsResponse, "confessions"> | null>(null);
   const [sort, setSort] = useState<SortMode>("new");
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [shameKey, setShameKey] = useState(0);
   const [apiStatus, setApiStatus] = useState<"ok" | "error" | "checking">("checking");
   const [mobileTab, setMobileTab] = useState<"feed" | "confess">("feed");
 
@@ -41,26 +37,9 @@ export default function TheWall() {
   }, []);
 
   // ── Load confessions ──────────────────────────────────────────
-  const fetchConfessions = useCallback(
-    async (newSort: SortMode, newPage: number) => {
-      setLoading(true);
-      try {
-        const data = await listConfessions(newSort, newPage, PER_PAGE);
-        setMeta({ total: data.total, page: data.page, per_page: data.per_page });
-        setConfessions(data.confessions);
-      } catch {
-        // keep existing state on error
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  useEffect(() => {
-    setPage(1);
-    fetchConfessions(sort, 1);
-  }, [sort, fetchConfessions]);
+  const { data: confessionsData, isLoading: loading } = useConfessions(sort, page);
+  const confessions = confessionsData?.confessions || [];
+  const meta = confessionsData ? { total: confessionsData.total, page: confessionsData.page, per_page: confessionsData.per_page } : null;
 
   function changeSort(s: SortMode) {
     if (s === sort) return;
@@ -70,14 +49,11 @@ export default function TheWall() {
   function goToPage(p: number) {
     if (p === page) return;
     setPage(p);
-    fetchConfessions(sort, p);
   }
 
   function handlePosted(c: Confession) {
     setSort("new");
     setPage(1);
-    fetchConfessions("new", 1);
-    setShameKey((k) => k + 1);
     setMobileTab("feed");
   }
 
@@ -195,7 +171,7 @@ export default function TheWall() {
       )}
 
       <StatsBox />
-      <HallOfShame refreshKey={shameKey} />
+      <HallOfShame />
     </>
   );
 

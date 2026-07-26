@@ -12,6 +12,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.4",
+    "@tanstack/react-query-devtools": "^5.101.4",
     "@supabase/supabase-js": "^2.110.1",
     "clsx": "^2.1.1",
     "framer-motion": "^11.1.7",

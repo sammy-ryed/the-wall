@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import QueryProvider from "@/components/QueryProvider";
 import { AuthProvider } from "@/components/AuthProvider";
 import KickedOutBanner from "@/components/KickedOutBanner";
 
@@ -71,11 +72,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body style={{ background: "#f5f0e8", color: "#0a0a0a" }}>
+      <body>
+        <QueryProvider>
         <AuthProvider>
           <KickedOutBanner />
           {children}
         </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

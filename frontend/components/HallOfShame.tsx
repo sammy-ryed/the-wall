@@ -1,23 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getLeaderboard, type Confession } from "@/lib/api";
+import { useLeaderboard } from "@/lib/reactQuery";
 
-interface Props {
-  /** refresh key — increment to trigger a re-fetch (after a new post) */
-  refreshKey?: number;
-}
-
-export default function HallOfShame({ refreshKey = 0 }: Props) {
-  const [items, setItems] = useState<Confession[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    getLeaderboard(3)
-      .then((data) => { setItems(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [refreshKey]);
+export default function HallOfShame() {
+  const { data: items = [], isLoading: loading } = useLeaderboard(3);
 
   return (
     <div style={{ padding: 20 }}>

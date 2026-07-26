@@ -196,8 +196,12 @@ export async function healthCheck(): Promise<{ status: string }> {
  * GET /confessions/{id}/replies
  * Public — returns all replies for a confession.
  */
-export async function getReplies(confessionId: string): Promise<Reply[]> {
-  return apiFetch<Reply[]>(`/confessions/${confessionId}/replies`);
+export async function getReplies(
+  confessionId: string,
+  page = 1,
+  perPage = 20
+): Promise<Reply[]> {
+  return apiFetch<Reply[]>(`/confessions/${confessionId}/replies?page=${page}&per_page=${perPage}`);
 }
 
 /**

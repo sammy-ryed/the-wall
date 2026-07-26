@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { roastConfession, postConfession, type RoastResponse, type Confession } from "@/lib/api";
+import { roastConfession, type RoastResponse, type Confession } from "@/lib/api";
+import { usePostConfession } from "@/lib/reactQuery";
 import { useAuth } from "@/components/AuthProvider";
 
 interface Props {
@@ -44,23 +45,22 @@ export default function ConfessForm({ onPosted, user }: Props) {
     }
   }
 
+  const postMutation = usePostConfession(session?.accessToken);
+
   async function handlePost() {
     if (!roast) return;
     setPosting(true);
     try {
-      const posted = await postConfession(
-        {
-          name: postName,
-          confession: text.trim(),
-          cringe_score: roast.cringe_score,
-          survival_probability: roast.survival_probability,
-          roast: roast.roast,
-          verdict: roast.verdict,
-          era: roast.era,
-          target_name: roast.target_name ?? null,
-        },
-        session?.accessToken
-      );
+      const posted = await postMutation.mutateAsync({
+        name: postName,
+        confession: text.trim(),
+        cringe_score: roast.cringe_score,
+        survival_probability: roast.survival_probability,
+        roast: roast.roast,
+        verdict: roast.verdict,
+        era: roast.era,
+        target_name: roast.target_name ?? null,
+      });
       onPosted(posted);
       setText("");
       setRoast(null);
