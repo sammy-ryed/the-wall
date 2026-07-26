@@ -21,6 +21,7 @@ services:
     restart: always
     environment:
       - DATABASE_URL=mysql+pymysql://walluser:wallpassword@db:3306/thewall
+      - REDIS_URL=redis://redis:6379/0
     env_file:
       - ./backend/.env
     ports:
